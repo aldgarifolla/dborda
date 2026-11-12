@@ -1,0 +1,26 @@
+name: military-demo-full
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: military_lab
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run python3 scripts/make_env.py first}
+    ports:
+      - "127.0.0.1:5437:5432"
+    volumes:
+      - military_lab_pgdata:/var/lib/postgresql/data
+      - ./init/10_full.sql:/docker-entrypoint-initdb.d/10_full.sql:ro
+      - ./init/20_reference_and_safe_views.sql:/docker-entrypoint-initdb.d/20_reference_and_safe_views.sql:ro
+      - ./init/25_full_workbook_demo.sql:/docker-entrypoint-initdb.d/25_full_workbook_demo.sql:ro
+      - ./init/30_restrict.sh:/docker-entrypoint-initdb.d/30_restrict.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d military_lab"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    shm_size: 256mb
+volumes:
+  military_lab_pgdata:

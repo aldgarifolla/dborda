@@ -1,0 +1,21 @@
+# Add-on for existing postgres_military_demo_full/compose.yaml; never replaces the lab DB.
+services:
+  web:
+    build: ./web
+    restart: unless-stopped
+    env_file: .env.web
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      APP_READER_PASSWORD: ${APP_READER_PASSWORD:?Run python3 scripts/make_env.py}
+      DJANGO_DEBUG: "1"
+    ports:
+      - "127.0.0.1:8001:8000"
+    volumes:
+      - ./web:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["sh", "-c", "python manage.py migrate --noinput && exec python manage.py runserver 0.0.0.0:8000"]
+    security_opt:
+      - no-new-privileges:true

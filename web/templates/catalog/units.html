@@ -1,0 +1,6 @@
+{% extends 'base.html' %}{% block title %}Подразделения{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">КАТАЛОГ</p><h1>Подразделения</h1><p class="sub">Доступно узлов: {{ total_access }}. Результаты ограничены выданными правами.</p></div></div>
+<div class="panel"><form class="search" method="get"><input name="q" placeholder="Поиск по названию или коду" value="{{ q }}" maxlength="90"><button class="btn primary" type="submit">Найти</button></form>
+{% if units %}<div class="table-scroll"><table><thead><tr><th>Название</th><th>Код</th><th>Уровень</th><th>Страна модели</th><th></th></tr></thead><tbody>{% for unit in units %}<tr><td>{{ unit.short_name }}</td><td class="mono">{{ unit.unit_code }}</td><td>{{ unit.level_name|default:'—' }}</td><td>{{ unit.country }}</td><td><a class="text-link" href="{% url 'unit_detail' unit.unit_code %}">Открыть</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty">Доступные подразделения не найдены.</div>{% endif %}</div>
+{% endblock %}

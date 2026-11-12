@@ -1,0 +1,51 @@
+{
+  "mil_db_postgres.sql": {
+    "size_bytes": 1735313,
+    "sha256": "404781d9ca522448bff4d6fe1aaf0bb27aeae432262cfeba573c8d7a34b4d37e"
+  },
+  "military_full (1).zip": {
+    "size_bytes": 4368163,
+    "sha256": "1d4f2ea33de10e7db45b29dd1cd8f7edda5b3869c745b743d53879a34dd03617"
+  },
+  "military_db_v2.db": {
+    "size_bytes": 3493888,
+    "sha256": "dcd3b570e487d8d6ac658822c552387d8c6bc384c3556d6f396114dec1a97ee1"
+  },
+  "military_db_v2_dump.sql": {
+    "size_bytes": 4931584,
+    "sha256": "a0c984e85f39e8a22d230ca38c3885ade4d7661dfcde6fdfdb353921cb64e205"
+  },
+  "military_full_обзор.xlsx": {
+    "size_bytes": 2191862,
+    "sha256": "d6f35c36b3e95d5c8d5b84d69afb4e4860e9211a1ebb3fa1eea24c6169ef76ee"
+  },
+  "military_db_v2_обзор.xlsx": {
+    "size_bytes": 1366497,
+    "sha256": "1c3492963d3f332f78bf85e5fee4378efca256c0d679c0b355b7fbeca8c46adc"
+  },
+  "Штатные_должности_численность_имущество_2026.xlsx": {
+    "size_bytes": 351765,
+    "sha256": "282a70222b093eed7900adbb475e097691048abb2d8ee08ae48f071c3ec28e57"
+  },
+  "built_from": "military_full (1).zip : military_full/military_full.sql",
+  "refdata_entry_counts": {
+    "Должности и звания": 19,
+    "Нормативная численность": 12,
+    "Имущество по нормам": 23
+  },
+  "note": "All baseline operational-looking records are synthetic per the supplied README; reference workbook rows are unverified for operational use.",
+  "workbook_import": {
+    "total_rows": 7982,
+    "counts_by_sheet": {
+      "Должности и звания": 19,
+      "Нормативная численность": 12,
+      "Имущество по нормам": 23,
+      "Модель должностей": 4078,
+      "Модель численности": 896,
+      "Модель имущества": 2932,
+      "Пояснения": 22
+    },
+    "note": "All seven sheets loaded for DEMO; the three model sheets duplicate the normalized full model and must not be added to it."
+  },
+  "demo_sql_sha256": "2d9f118bb18078ad5724bea12512ff2fb9478122f16ec6cb28b5720845a4a6cc"
+}
