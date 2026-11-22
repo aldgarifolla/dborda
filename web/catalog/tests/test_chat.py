@@ -209,3 +209,22 @@ class ClaudeTitleTests(SimpleTestCase):
         kwargs = client_cls.return_value.messages.create.call_args.kwargs
         self.assertEqual(kwargs['thinking'], {'type': 'disabled'})
         self.assertNotIn('tools', kwargs)
+
+
+class LatinItemTests(SimpleTestCase):
+    def test_codes_become_cyrillic(self):
+        from catalog.assistant.tools import cyrillic_item
+        self.assertEqual(cyrillic_item('BMP-2'), 'БМП-2')
+        self.assertEqual(cyrillic_item('T-72B'), 'Т-72Б')
+        self.assertEqual(cyrillic_item('ak-74m'), 'АК-74М')
+        self.assertEqual(cyrillic_item('BM-21'), 'БМ-21')
+        self.assertEqual(cyrillic_item('M1A2 Abrams'), 'М1А2 Abrams')
+
+    @patch('catalog.assistant.tools.repo')
+    def test_item_card_falls_back_to_cyrillic(self, repo):
+        from catalog.assistant import tools
+        repo.get_item.side_effect = lambda s: {'item_sname': 'БМП-2', 'item_name': 'Боевая машина пехоты БМП-2',
+                                               'category': 'Бронетехника'} if s == 'БМП-2' else None
+        repo.item_specs.return_value = []
+        repo.item_holders.return_value = []
+        self.assertEqual(tools.item_card({'ОКР-АСТ'}, 'BMP-2')['title'], 'Карточка образца — БМП-2')

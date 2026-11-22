@@ -10,7 +10,7 @@
 </div>
 {% include 'catalog/_unit_tabs.html' %}
 {% if tab == 'summary' %}
-<div class="panel"><h2>{% if nav.child_level == 'рота' %}Роты{% elif nav.child_level == 'взвод' %}Взводы{% elif nav.child_level == 'отделение' %}Отделения{% else %}Состав{% endif %}</h2>{% if nav.child_level %}<p class="muted">Нажмите на подразделение, чтобы открыть уровень ниже. В управлении — {{ u.own_personnel }} чел. (вкладка «Должности»).</p>{% endif %}
+<div class="panel"><h2>{% if nav.child_level == 'рота' %}Роты{% elif nav.child_level == 'взвод' %}Взводы{% elif nav.child_level == 'отделение' %}Отделения{% else %}Состав{% endif %}</h2>{% if nav.child_level %}<p class="muted">Нажмите на подразделение, чтобы открыть уровень ниже. Командир и управление этого уровня — {{ u.own_personnel }} чел. (вкладка «Должности»).</p>{% endif %}
 {% include 'catalog/_subunits.html' %}</div>
 {% endif %}
 {% endblock %}

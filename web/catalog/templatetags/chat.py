@@ -33,3 +33,19 @@ def chat_text(text):
             flush()
     flush()
     return mark_safe(''.join(blocks))
+
+
+@register.filter
+def years(value):
+    """31 -> «31 год», 22 -> «22 года», 25 -> «25 лет»."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return value
+    if n % 10 == 1 and n % 100 != 11:
+        word = 'год'
+    elif n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+        word = 'года'
+    else:
+        word = 'лет'
+    return f'{n} {word}'

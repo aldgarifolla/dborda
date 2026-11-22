@@ -1,0 +1,28 @@
+{% extends 'base.html' %}{% load chat %}{% block title %}{{ p.full_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{% url 'district_list' %}">Округа</a><span>/</span>{% if d %}<a href="{% url 'district_detail' d.district_code %}">{{ d.short_name }}</a><span>/</span>{% endif %}<a href="{% url 'formation_detail' p.district_code p.formation_code %}?tab=people">{{ p.formation_code }}</a><span>/</span><a href="{% url 'subunit_detail' p.district_code p.formation_code p.subunit_code %}?tab=people">{{ p.subunit_code }}</a></div>
+<div class="page-heading"><div><p class="eyebrow">ВОЕННОСЛУЖАЩИЙ · {{ p.personal_number }}</p><h1>{{ p.full_name }}</h1><p class="sub">{{ p.rank_name }} · {{ p.position_name }}</p></div><span class="pill">Вымышленный человек (C)</span></div>
+<div class="stats">
+  <div class="stat"><span>Возраст</span><strong>{{ p.age }}</strong><small>{{ p.birth_date|date:"d.m.Y" }}</small></div>
+  <div class="stat"><span>Звание</span><strong style="font-size:19px">{{ p.rank_name }}</strong><small>{{ p.rank_category }}</small></div>
+  <div class="stat"><span>Служба</span><strong style="font-size:19px">{% if p.service_type == 'срочная воинская служба' %}срочная{% else %}по контракту{% endif %}</strong><small>с {{ p.service_start|date:"d.m.Y" }}{% if p.contract_end %} до {{ p.contract_end|date:"d.m.Y" }}{% endif %}</small></div>
+  <div class="stat"><span>Подразделение</span><strong style="font-size:19px">{{ p.subunit_code }}</strong><small>{{ p.subunit_name }}</small></div>
+</div>
+<div class="panel"><h2>Служба</h2><div class="table-scroll"><table><tbody>
+  <tr><td class="muted">Должность</td><td>{{ p.position_name }}</td></tr>
+  <tr><td class="muted">Подразделение</td><td><a href="{% url 'subunit_detail' p.district_code p.formation_code p.subunit_code %}">{{ p.subunit_name }} ({{ p.subunit_code }})</a></td></tr>
+  <tr><td class="muted">Соединение, округ</td><td>{{ f.formation_name|default:p.formation_code }}{% if d %}, {{ d.short_name }}{% endif %}</td></tr>
+  <tr><td class="muted">Вид службы</td><td>{{ p.service_type }}</td></tr>
+  <tr><td class="muted">Личный номер</td><td class="mono">{{ p.personal_number }}</td></tr>
+</tbody></table></div></div>
+<div class="panel"><h2>Анкета</h2><div class="table-scroll"><table><tbody>
+  <tr><td class="muted">Дата рождения</td><td>{{ p.birth_date|date:"d.m.Y" }} ({{ p.age|years }})</td></tr>
+  <tr><td class="muted">Национальность</td><td>{{ p.nationality }}</td></tr>
+  <tr><td class="muted">Место рождения</td><td>{{ p.birthplace|default:'—' }}</td></tr>
+  <tr><td class="muted">Образование</td><td>{{ p.education|default:'—' }}</td></tr>
+  <tr><td class="muted">Семейное положение</td><td>{{ p.marital_status|default:'—' }}{% if p.children %}, детей: {{ p.children }}{% endif %}</td></tr>
+  <tr><td class="muted">Рост, вес</td><td>{{ p.height_cm }} см, {{ p.weight_kg }} кг</td></tr>
+  <tr><td class="muted">Группа крови</td><td>{{ p.blood_group|default:'—' }}</td></tr>
+  <tr><td class="muted">Категория годности</td><td>{{ p.fitness_category|default:'—' }}</td></tr>
+</tbody></table></div><p class="muted">{% if p.origin == 'reused' %}Человек из учебного архива проекта (синтетические данные).{% else %}Человек сгенерирован для учебной модели округов.{% endif %} Все совпадения с реальными людьми случайны.</p></div>
+{% endblock %}

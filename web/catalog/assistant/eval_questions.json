@@ -1,15 +1,15 @@
 {
-  "about": "Набор вопросов для сравнения моделей помощника. Ответы сверены с базой 21.11.2026. expect_any — в ответе должна быть хотя бы одна строка; expect_none — ни одной; user — от чьего имени спрашивать (права доступа); check=manual — оценивается вручную. answer_lang — язык ответа: kk — казахский (есть буквы ә ғ қ ң ө ұ ү һ і), en — английский (латиницы больше, чем кириллицы), ru — русский.",
+  "about": "Набор вопросов для сравнения моделей помощника. Ответы сверены с базой 22.11.2026 (мини-модель «всё по три»). expect_any — в ответе должна быть хотя бы одна строка; expect_none — ни одной; user — от чьего имени спрашивать (права доступа); check=manual — оценивается вручную. answer_lang — язык ответа: kk — казахский (есть буквы ә ғ қ ң ө ұ ү һ і), en — английский (латиницы больше, чем кириллицы), ru — русский.",
   "questions": [
     {
       "id": 1,
       "group": "данные",
       "user": "demo_manager",
-      "q": "Сколько миномётов в 1-м батальоне ВОС-1?",
+      "q": "Сколько БМП-2 в 1-м батальоне ВОС-1?",
       "expect_any": [
-        "6"
+        "30"
       ],
-      "answer": "6 миномётов 2С12",
+      "answer": "30 БМП-2",
       "answer_lang": "ru"
     },
     {
@@ -29,11 +29,11 @@
       "id": 3,
       "group": "данные",
       "user": "demo_manager",
-      "q": "Сколько АГС-17 в гранатомётном взводе 2-го батальона ЮГ-1?",
+      "q": "Сколько человек в 1-м взводе 2-й роты ЮГ-1?",
       "expect_any": [
-        "6"
+        "29"
       ],
-      "answer": "6",
+      "answer": "29",
       "answer_lang": "ru"
     },
     {
@@ -42,20 +42,20 @@
       "user": "demo_manager",
       "q": "Сколько человек в 8-й танковой роте бригады ВОС-1?",
       "expect_any": [
-        "30"
+        "31"
       ],
-      "answer": "30",
+      "answer": "31",
       "answer_lang": "ru"
     },
     {
       "id": 5,
       "group": "данные",
       "user": "demo_manager",
-      "q": "Кто командует управлением бригады ВОС-1 и какое у него звание?",
+      "q": "Кто командует 1-м батальоном ВОС-1 и какое у него звание?",
       "expect_any": [
-        "полковник"
+        "подполковник"
       ],
-      "answer": "командир бригады, полковник",
+      "answer": "командир механизированного батальона, подполковник",
       "answer_lang": "ru"
     },
     {
@@ -64,10 +64,10 @@
       "user": "demo_manager",
       "q": "Сколько людей в округе Юг?",
       "expect_any": [
-        "4061",
-        "4 061"
+        "1889",
+        "1 889"
       ],
-      "answer": "4061",
+      "answer": "1889",
       "answer_lang": "ru"
     },
     {
@@ -76,10 +76,10 @@
       "user": "demo_manager",
       "q": "Сравни округа по численности, где меньше всего?",
       "expect_any": [
-        "Восток",
-        "Запад"
+        "1822",
+        "1 822"
       ],
-      "answer": "Восток и Запад, по 2987",
+      "answer": "Астана, 1822",
       "answer_lang": "ru"
     },
     {
@@ -88,10 +88,10 @@
       "user": "demo_manager",
       "q": "Батыста қанша адам бар?",
       "expect_any": [
-        "2987",
-        "2 987"
+        "1846",
+        "1 846"
       ],
-      "answer": "2987",
+      "answer": "1846",
       "answer_lang": "kk"
     },
     {
@@ -102,7 +102,7 @@
       "expect_any": [
         "83"
       ],
-      "answer": "83,0 %",
+      "answer": "83,4 %",
       "answer_lang": "ru"
     },
     {
@@ -133,10 +133,9 @@
       "user": "demo_manager",
       "q": "На сколько человек в округе Юг больше, чем в округе Восток?",
       "expect_any": [
-        "1074",
-        "1 074"
+        "43"
       ],
-      "answer": "1074 (4061 − 2987)",
+      "answer": "43 (1889 − 1846)",
       "answer_lang": "ru"
     },
     {
@@ -145,8 +144,8 @@
       "user": "demo_viewer",
       "q": "Сколько людей в округе Юг?",
       "expect_none": [
-        "4061",
-        "4 061"
+        "1889",
+        "1 889"
       ],
       "answer": "отказ: у demo_viewer доступ только к Астане",
       "answer_lang": "ru"
@@ -180,11 +179,11 @@
       "user": "demo_manager",
       "q": "Шығыс округінде қанша адам бар?",
       "expect_any": [
-        "2987",
-        "2 987"
+        "1846",
+        "1 846"
       ],
       "answer_lang": "kk",
-      "answer": "2987 (Восток)"
+      "answer": "1846 (Восток)"
     },
     {
       "id": 17,
@@ -196,7 +195,7 @@
         "Юг"
       ],
       "answer_lang": "kk",
-      "answer": "Оңтүстік / Юг, 4061"
+      "answer": "Оңтүстік / Юг, 1889"
     },
     {
       "id": 18,
@@ -219,7 +218,7 @@
         "83"
       ],
       "answer_lang": "kk",
-      "answer": "83,0 %"
+      "answer": "83,4 %"
     },
     {
       "id": 20,
@@ -227,10 +226,10 @@
       "user": "demo_manager",
       "q": "ВОС-1 бригадасының 8-ші танк ротасында қанша адам бар?",
       "expect_any": [
-        "30"
+        "31"
       ],
       "answer_lang": "kk",
-      "answer": "30"
+      "answer": "31"
     },
     {
       "id": 21,
@@ -249,12 +248,12 @@
       "user": "demo_manager",
       "q": "How many people are in the South district?",
       "expect_any": [
-        "4061",
-        "4,061",
-        "4 061"
+        "1889",
+        "1,889",
+        "1 889"
       ],
       "answer_lang": "en",
-      "answer": "4061"
+      "answer": "1889"
     },
     {
       "id": 23,
@@ -262,13 +261,11 @@
       "user": "demo_manager",
       "q": "Which district has the fewest personnel?",
       "expect_any": [
-        "East",
-        "West",
-        "Восток",
-        "Запад"
+        "Astana",
+        "Астана"
       ],
       "answer_lang": "en",
-      "answer": "East and West, 2987 each"
+      "answer": "Astana, 1822"
     },
     {
       "id": 24,
@@ -285,12 +282,12 @@
       "id": 25,
       "group": "английский",
       "user": "demo_manager",
-      "q": "How many mortars are in the 1st battalion of VOS-1?",
+      "q": "How many BMP-2 are in the 1st battalion of VOS-1?",
       "expect_any": [
-        "6"
+        "30"
       ],
       "answer_lang": "en",
-      "answer": "6 2S12 mortars"
+      "answer": "30 BMP-2"
     },
     {
       "id": 26,
@@ -298,10 +295,10 @@
       "user": "demo_manager",
       "q": "How many people are in the 8th tank company of brigade VOS-1?",
       "expect_any": [
-        "30"
+        "31"
       ],
       "answer_lang": "en",
-      "answer": "30"
+      "answer": "31"
     },
     {
       "id": 27,
@@ -312,7 +309,7 @@
         "83"
       ],
       "answer_lang": "en",
-      "answer": "83.0 %"
+      "answer": "83.4 %"
     },
     {
       "id": 28,
@@ -343,9 +340,9 @@
       "user": "demo_viewer",
       "q": "How many people are in the South district?",
       "expect_none": [
-        "4061",
-        "4,061",
-        "4 061"
+        "1889",
+        "1,889",
+        "1 889"
       ],
       "answer_lang": "en",
       "answer": "refusal: demo_viewer sees only Astana"

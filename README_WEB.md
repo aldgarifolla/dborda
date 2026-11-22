@@ -56,6 +56,20 @@ ollama pull qwen2.5:14b
 - `OLLAMA_MODEL` — другая модель Ollama с поддержкой инструментов, например `qwen2.5:3b` (быстрее, слабее);
 - `OLLAMA_URL`, `OLLAMA_TIMEOUT` — адрес Ollama и таймаут в секундах.
 
+### Данные округов и личный состав
+
+Мини-модель «всё по три»: 4 округа × 3 бригады × 3 батальона × 3 роты × 3 взвода × 3 отделения. Пересборка:
+
+```bash
+docker compose exec -T db psql -U postgres -d military_lab -v ON_ERROR_STOP=1 -q < build/stages/70_districts.sql
+docker compose exec -T db psql -U postgres -d military_lab -v ON_ERROR_STOP=1 -q < build/stages/72_district_people.sql
+```
+
+Этап 72 запускается всегда после 70: 70 пересоздаёт схему `district` вместе с таблицами людей. На каждом штатном месте —
+вымышленный человек: часть взята из учебного архива (`mil_core.person`), остальные догенерированы (ФИО из имён архива,
+возраст и вид службы — по званию). ИИН не создаётся. На сайте — вкладка «Личный состав» у бригады и подразделения и
+карточка человека (`/people/<личный номер>/`); человек из чужого округа даёт 404.
+
 ### Облачные модели
 
 - **Claude (Anthropic):** в `.env` — `ASSISTANT_PROVIDER=catalog.assistant.claude.ClaudePlanner`, в `.env.web` — `ANTHROPIC_API_KEY=...`; модель по умолчанию `claude-haiku-5-5`, другая — `CLAUDE_MODEL=claude-sonnet-5-5` в `.env.web`.

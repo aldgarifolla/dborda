@@ -147,16 +147,42 @@ def compare_districts(scope, metric):
     return table
 
 
+# Обозначения образцов латиницей (английский вопрос: «BMP-2», «T-72B», «AK-74M») -> кириллица, как в каталоге.
+# Применяется только если по исходному написанию ничего не нашлось: в каталоге есть и настоящие латинские
+# названия (M1A2 Abrams, Javelin).
+LATIN_DIGRAPHS = (('SHCH', 'Щ'), ('ZH', 'Ж'), ('KH', 'Х'), ('CH', 'Ч'), ('SH', 'Ш'), ('YU', 'Ю'), ('YA', 'Я'), ('TS', 'Ц'))
+LATIN_LETTERS = dict(zip('ABVGDEZIJKLMNOPRSTUFHCY', 'АБВГДЕЗИЙКЛМНОПРСТУФХЦЫ'))
+LATIN_TOKEN = re.compile(r'(?<![A-Za-z])[A-Za-z]{1,4}(?![A-Za-z])')
+
+
+def cyrillic_item(text):
+    """«BMP-2» -> «БМП-2», «T-72B» -> «Т-72Б», «ak-74m» -> «АК-74М». Слова длиннее 4 букв не трогаются."""
+    def convert(m):
+        word = m.group(0).upper()
+        for lat, cyr in LATIN_DIGRAPHS:
+            word = word.replace(lat, cyr)
+        return ''.join(LATIN_LETTERS.get(ch, ch) for ch in word)
+    return LATIN_TOKEN.sub(convert, str(text))
+
+
+def _items(text, limit=None):
+    found = repo.find_items(str(text)) if limit is None else repo.find_items(str(text), limit=limit)
+    if not found and cyrillic_item(text) != str(text):
+        alt = cyrillic_item(text)
+        found = repo.find_items(alt) if limit is None else repo.find_items(alt, limit=limit)
+    return found
+
+
 def find_item(scope, text):
     return _table(f'Поиск в каталоге: «{str(text)[:60]}»',
                   [('item_sname', 'Сокращение'), ('item_name', 'Наименование'), ('category', 'Категория')],
-                  repo.find_items(str(text)), 'registry_api.items, registry_api.item_aliases')
+                  _items(text), 'registry_api.items, registry_api.item_aliases')
 
 
 def item_card(scope, item):
-    found = repo.get_item(str(item)[:200])
+    found = repo.get_item(str(item)[:200]) or repo.get_item(cyrillic_item(item)[:200])
     if not found:
-        matches = repo.find_items(str(item), limit=1)
+        matches = _items(item, limit=1)
         found = repo.get_item(matches[0]['item_sname']) if matches else None
     if not found:
         raise ToolError(f'Образец «{str(item)[:60]}» в каталоге не найден.')
@@ -214,7 +240,7 @@ def unit_code_from_numbers(formation, battalion=None, company=None, platoon=None
 
 
 def find_unit_by_name(scope, formation, unit_name, battalion=None):
-    """Подразделение бригады по названию («гранатомётный взвод», «миномётная батарея», «медпункт»,
+    """Подразделение бригады по названию («танковый батальон», «реактивный дивизион»,
     «разведывательная рота», «управление»), при необходимости — внутри батальона. Берётся самое старшее."""
     text = str(unit_name).casefold().replace('ё', 'е').replace('медпункт', 'медицинский пункт')
     # основа слова — первые ~70 % букв: «гранатометного» -> «гранатоме», «роты» -> «рот»
@@ -312,17 +338,16 @@ TOOLS = {
     'unit_composition': (unit_composition, 'Личный состав (офицеры, сержанты, солдаты), должности и техника бригады '
                          'или любого её подразделения вплоть до отделения. Укажи бригаду и номера нужных уровней; '
                          'для всей бригады — только formation.',
-                         {'formation': {'type': 'string', 'description': 'Код бригады: АСТ-1…3, ВОС-1…3, ЗАП-1…3, ЮГ-1…4'},
+                         {'formation': {'type': 'string', 'description': 'Код бригады: АСТ-1…3, ВОС-1…3, ЗАП-1…3, ЮГ-1…3'},
                           'battalion': {'type': 'integer', 'description': 'Номер батальона (дивизиона) 1–3'},
                           'company': {'type': 'integer', 'description': 'Номер роты (батареи): сквозной 1–9 или 1–3 внутри батальона'},
                           'platoon': {'type': 'integer', 'description': 'Номер взвода 1–3 (в батарее 3 — взвод управления)'},
                           'squad': {'type': 'integer', 'description': 'Номер отделения (экипажа, расчёта) 1–3'},
-                          'unit_name': {'type': 'string', 'description': 'Название подразделения без номера, если оно названо словами: '
-                                                                         'гранатомётный взвод, миномётная батарея, медицинский пункт, '
-                                                                         'разведывательная рота, управление бригады'},
+                          'unit_name': {'type': 'string', 'description': 'Название батальона без номера, если он назван словами: '
+                                                                         'танковый батальон, реактивный дивизион, ремонтный батальон'},
                           'unit': {'type': 'string', 'description': 'Готовый код, если он известен, например ВОС-1.Б3.Р8.В2'},
                           'search': {'type': 'string', 'description': 'Если спрашивают про конкретный образец или должность — '
-                                                                      'слово из вопроса: миномёт, АГС, танк, командир'}},
+                                                                      'слово из вопроса: танк, БМП, командир'}},
                          []),
     'formation_structure': (formation_structure, 'Структура одного соединения: батальоны и роты, число взводов и отделений.',
                             {'formation': {'type': 'string', 'description': 'Код соединения, например ВОС-1'}}, ['formation']),

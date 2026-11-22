@@ -113,7 +113,7 @@ def formation_detail(request, code, fcode):
     tab = unit_tab(request)
     return render(request, 'catalog/formation.html', {
         'd': district, 'f': formation, 'nav': repo.subunit_nav(repo.subunits(fcode, scope)), 'tab': tab,
-        **unit_tab_data(tab, fcode, scope, own=False),
+        **unit_tab_data(tab, fcode, scope, own=False, request=request),
     })
 
 
@@ -132,11 +132,11 @@ def subunit_detail(request, code, fcode, scode):
     tab = unit_tab(request)
     return render(request, 'catalog/subunit.html', {
         'd': district, 'f': formation, 'nav': nav, 'u': nav['node'], 'tab': tab,
-        **unit_tab_data(tab, scode, scope, own=True),
+        **unit_tab_data(tab, scode, scope, own=True, request=request),
     })
 
 
-UNIT_TABS = ('summary', 'staff', 'equipment')
+UNIT_TABS = ('summary', 'staff', 'people', 'equipment')
 
 
 def unit_tab(request):
@@ -144,14 +144,33 @@ def unit_tab(request):
     return tab if tab in UNIT_TABS else 'summary'
 
 
-def unit_tab_data(tab, code, scope, own):
-    """Данные вкладок бригады и подразделения: должности (своё управление и все подчинённые) и техника."""
+def unit_tab_data(tab, code, scope, own, request=None):
+    """Данные вкладок бригады и подразделения: должности (своё управление и все подчинённые), люди и техника."""
+    if tab == 'people':
+        q = (request.GET.get('q', '') if request else '')[:60]
+        page = request.GET.get('page') if request else 1
+        rows, total = repo.unit_people(code, scope, page, q)
+        return {'people': rows, 'q': q, 'pager': pager(page, total),
+                'query': urlencode({'tab': 'people', 'q': q}) + '&'}
     if tab == 'staff':
         return {'own_staff': repo.unit_staff(code, scope, own_only=True) if own else [],
                 'staff': repo.unit_staff(code, scope)}
     if tab == 'equipment':
         return {'equipment': repo.unit_equipment(code, scope)}
     return {'sources': repo.norm_sources()}
+
+
+@login_required
+def person_detail(request, number):
+    """Карточка вымышленного военнослужащего. Чужой округ — 404, как будто человека нет."""
+    scope = scope_for(request)
+    person = repo.get_person(number, scope)
+    if not person:
+        raise Http404('Человек не найден')
+    return render(request, 'catalog/person.html', {
+        'p': person, 'd': repo.get_district(person['district_code'], scope),
+        'f': repo.get_formation(person['formation_code'], scope),
+    })
 
 
 @login_required

@@ -153,6 +153,36 @@ def unit_staff(code, scope, own_only=False):
                       ORDER BY {CATEGORY_ORDER}, sum(qty) DESC, position_name''', [code, like_prefix(code), list(scope)])
 
 
+PEOPLE_COLUMNS = ('subunit_code, subunit_name, level, seq, seat, position_name, rank_name, rank_category, '
+                  'personal_number, full_name, age, service_type, nationality')
+
+
+def unit_people(code, scope, page=1, term=''):
+    """Вымышленный личный состав подразделения вместе с подчинёнными: (строки страницы, всего).
+    term — поиск по ФИО, должности или личному номеру."""
+    if not scope:
+        return [], 0
+    page, offset = page_bounds(page)
+    where = '(subunit_code = %s OR subunit_code LIKE %s) AND district_code = ANY(%s::text[])'
+    args = [code, like_prefix(code), list(scope)]
+    if term.strip():
+        where += ' AND (full_name ILIKE %s OR position_name ILIKE %s OR personal_number ILIKE %s)'
+        args += [like(term)] * 3
+    total = select(f'SELECT count(*) AS n FROM registry_api.subunit_people WHERE {where}', args)[0]['n']
+    rows = select(f'SELECT {PEOPLE_COLUMNS} FROM registry_api.subunit_people WHERE {where} '
+                  'ORDER BY subunit_code, seq, seat LIMIT %s OFFSET %s', args + [PAGE_SIZE, offset])
+    return rows, total
+
+
+def get_person(personal_number, scope):
+    """Карточка человека — только если его округ в области доступа пользователя."""
+    if not scope:
+        return None
+    rows = select('SELECT * FROM registry_api.subunit_people WHERE personal_number = %s AND district_code = ANY(%s::text[])',
+                  [str(personal_number)[:20], list(scope)])
+    return rows[0] if rows else None
+
+
 def unit_equipment(code, scope):
     """Техника и вооружение подразделения или соединения вместе с подчинёнными."""
     if not scope:

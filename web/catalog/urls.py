@@ -6,6 +6,7 @@ urlpatterns = [
     path('districts/<str:code>/', views.district_detail, name='district_detail'),
     path('districts/<str:code>/formations/<str:fcode>/', views.formation_detail, name='formation_detail'),
     path('districts/<str:code>/formations/<str:fcode>/units/<str:scode>/', views.subunit_detail, name='subunit_detail'),
+    path('people/<str:number>/', views.person_detail, name='person_detail'),
     path('items/', views.items, name='items'),
     path('items/<path:sname>/', views.item_detail, name='item_detail'),
     path('assistant/', views.assistant, name='assistant'),
