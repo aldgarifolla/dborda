@@ -1,9 +1,0 @@
-{% extends 'base.html' %}{% block title %}Excel-модели{% endblock %}
-{% block content %}
-<div class="page-heading"><div><p class="eyebrow">ИМПОРТ XLSX</p><h1>Excel-модели</h1><p class="sub">Показаны только строки, привязанные к разрешённым подразделениям. Модели не складываются с основной БД повторно.</p></div></div>
-<div class="panel"><div class="switch-row"><a href="?kind=positions" class="btn {% if kind == 'positions' %}primary{% endif %}">Должности</a><a href="?kind=headcounts" class="btn {% if kind == 'headcounts' %}primary{% endif %}">Численность</a><a href="?kind=assets" class="btn {% if kind == 'assets' %}primary{% endif %}">Имущество</a></div>
-<form class="search" method="get"><input type="hidden" name="kind" value="{{ kind }}"><input name="q" placeholder="Поиск по пути или коду подразделения" value="{{ q }}" maxlength="90"><button class="btn primary" type="submit">Найти</button></form>
-{% if rows %}<div class="table-scroll"><table><thead><tr><th>Код</th><th>Подразделение</th>
-{% if kind == 'positions' %}<th>Должность</th><th>Звание</th><th>Мест</th>{% elif kind == 'headcounts' %}<th>Уровень</th><th>Собственных мест</th><th>С подчинёнными</th>{% else %}<th>Предмет</th><th>Кол-во</th><th>Регистр</th>{% endif %}
-</tr></thead><tbody>{% for r in rows %}<tr><td class="mono">{{ r.unit_code }}</td><td>{{ r.unit_path|default:'—' }}</td>{% if kind == 'positions' %}<td>{{ r.position_name }}</td><td>{{ r.rank_name }}</td><td>{{ r.model_slots|default_if_none:'—' }}</td>{% elif kind == 'headcounts' %}<td>{{ r.level_name }}</td><td>{{ r.own_slots|default_if_none:'—' }}</td><td>{{ r.aggregate_slots|default_if_none:'—' }}</td>{% else %}<td>{{ r.item_name }}</td><td>{{ r.model_qty|default_if_none:'—' }} {{ r.unit_measure|default:'' }}</td><td>{{ r.register_name }}</td>{% endif %}</tr>{% endfor %}</tbody></table></div>
-{% else %}<div class="empty">Для разрешённых подразделений подходящих строк пока нет.</div>{% endif %}</div>{% endblock %}

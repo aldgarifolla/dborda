@@ -18,7 +18,7 @@ def assign_grant(actor, target, root_code, action):
     if not UserRole.objects.filter(user=target, role='viewer').exists():
         raise GrantDenied('Назначать права можно только пользователям viewer')
     if action not in ('grant', 'revoke') or root_code not in repo.allowed_codes(actor):
-        raise GrantDenied('Подразделение недоступно')
+        raise GrantDenied('Округ недоступен')
     with transaction.atomic():
         if action == 'grant':
             UnitGrant.objects.update_or_create(user=target, root_code=root_code, defaults={'is_active': True})

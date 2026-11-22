@@ -1,8 +1,143 @@
-{% extends 'base.html' %}{% block title %}Помощник{% endblock %}
-{% block content %}<div class="page-heading"><div><p class="eyebrow">ПОМОЩНИК</p><h1>Вопросы к учебной базе</h1><p class="sub">Пока фиксированные команды без LLM. Числа выдаёт PostgreSQL через Django после проверки доступа.</p></div><span class="pill">Rule-based MVP</span></div>
-<div class="panel assistant"><div class="assistant-icon">◉</div><h2>Чем помочь?</h2><p class="muted">Выбери подразделение и задай вопрос. Доступны расчёты штатных позиций и просмотр записей имущества.</p>
-{% if available %}<form method="post">{% csrf_token %}<label for="unit_code">Подразделение</label><select name="unit_code" id="unit_code" required><option value="">Выберите подразделение</option>{% for unit in available %}<option value="{{ unit.unit_code }}" {% if unit.unit_code == chosen %}selected{% endif %}>{{ unit.short_name }} · {{ unit.unit_code }}</option>{% endfor %}</select>
-<label for="question">Вопрос</label><textarea id="question" name="question" rows="3" maxlength="500" placeholder="Сколько штатных позиций вместе с подчинёнными?" required>{{ message }}</textarea><button type="submit" class="btn primary">Получить ответ</button></form>
-{% else %}<div class="empty">Для вопросов о подразделениях нужен доступ хотя бы к одному учебному узлу.</div>{% endif %}
-{% if response %}<div class="assistant-response"><h3>{{ response.title }}</h3><p>{{ response.text }}</p>{% if response.rows %}<ul>{% for line in response.rows %}<li>{{ line }}</li>{% endfor %}</ul>{% endif %}{% if response.source %}<small>Источник расчёта: {{ response.source }}</small>{% endif %}</div>{% endif %}
-<div class="hint">Примеры: «Сколько штатных позиций?», «Какое имущество?», «Сколько позиций вместе с подчинёнными?»</div></div>{% endblock %}
+{% extends 'base.html' %}{% block title %}{% if chat %}{{ chat.title }}{% else %}Помощник{% endif %}{% endblock %}
+{% block main_class %}chat-mode{% endblock %}{% block footer %}{% endblock %}
+{% block nav_assistant %}<div class="nav-chats">
+  <a class="nav-chat nav-chat-new{% if not chat %} active{% endif %}" href="{% url 'assistant' %}">＋ Новый чат</a>
+  <div id="chat-list">{% for c in chats %}{% include 'catalog/_chat_nav_item.html' with current=chat %}{% endfor %}</div>
+</div>{% endblock %}
+{% block content %}
+<div class="chat{% if chat_messages %} has-msgs{% endif %}" id="chat">
+  <div class="chat-head"{% if not chat %} hidden{% endif %}><h1 class="chat-title" id="chat-title">{{ chat.title }}</h1></div>
+
+  <div class="chat-scroll" id="chat-scroll">
+    <div class="chat-thread" id="chat-thread">{% for m in chat_messages %}{% include 'catalog/_chat_message.html' %}{% endfor %}</div>
+    {% if not chat %}<div class="chat-welcome" id="chat-welcome">
+      <div class="welcome-mark">◉</div>
+      <h1>Чем помочь, {{ user.username }}?</h1>
+      {% if districts %}<p class="muted">Спрашивайте по-русски, по-казахски или по-английски. Доступные округа: {% for d in districts %}{{ d.short_name }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>
+      <div class="chips">{% for e in examples %}<button type="button" class="chip" data-question="{{ e }}">{{ e }}</button>{% endfor %}</div>
+      {% else %}<div class="empty">Для вопросов нужен доступ хотя бы к одному округу.</div>{% endif %}
+    </div>{% endif %}
+  </div>
+
+  {% if districts %}<form class="composer" id="composer" method="post" action="{% if chat %}{% url 'assistant_chat' chat.pk %}{% else %}{% url 'assistant' %}{% endif %}">{% csrf_token %}
+    <div class="composer-box">
+      <textarea id="question" name="question" rows="1" maxlength="500" placeholder="{% if chat %}Ответить…{% else %}Спросите про округа, бригады, технику или запасы{% endif %}" required aria-label="Вопрос"></textarea>
+      <button type="submit" class="send" aria-label="Отправить" title="Отправить (Enter)">↑</button>
+    </div>
+    <p class="composer-note">Enter — отправить, Shift+Enter — новая строка. Числа берутся из учебной базы, SQL помощник не пишет.</p>
+  </form>{% endif %}
+</div>
+<script>
+(function () {
+  const csrf = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
+  const currentId = () => { const m = location.pathname.match(/\/assistant\/c\/(\d+)\//); return m ? m[1] : ''; };
+  function setTitle(id, title) {
+    const row = document.querySelector('.nav-chat-row[data-chat="' + id + '"]');
+    if (row) {
+      const link = row.querySelector('.nav-chat'); link.textContent = title; link.title = title;
+      row.querySelector('.nav-rename input[name=title]').value = title;
+      row.querySelector('.nav-delete').dataset.title = title;
+    }
+    if (currentId() === String(id)) {
+      const h = document.getElementById('chat-title'); if (h) h.textContent = title;
+      document.title = title + ' · Registry Demo';
+    }
+  }
+  function wireRow(row) {
+    if (!row) return;
+    const menu = row.querySelector('.nav-chat-menu');
+    menu.addEventListener('toggle', () => {
+      if (!menu.open) return;
+      document.querySelectorAll('.nav-chat-menu[open]').forEach((m) => { if (m !== menu) m.open = false; });
+      // меню поверх страницы: список чатов прокручивается и обрезал бы его
+      const box = menu.querySelector('.nav-chat-actions'), r = row.getBoundingClientRect();
+      box.style.left = r.left + 'px'; box.style.width = r.width + 'px';
+      const h = box.offsetHeight, below = r.bottom + 4 + h <= window.innerHeight;
+      box.style.top = (below ? r.bottom + 4 : Math.max(8, r.top - 4 - h)) + 'px';
+      const input = row.querySelector('.nav-rename input[name=title]'); input.focus({preventScroll: true}); input.select();
+    });
+    row.querySelector('.nav-rename').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.currentTarget;
+      try {
+        const r = await fetch(f.action, {method: 'POST', body: new FormData(f), headers: {'X-Requested-With': 'fetch'}});
+        if (r.ok) { const t = await r.json(); setTitle(row.dataset.chat, t.title); menu.open = false; }
+      } catch (err) { f.submit(); }
+    });
+    row.querySelector('.nav-delete').addEventListener('submit', (e) => {
+      const f = e.currentTarget;
+      f.querySelector('[name=current]').value = currentId();
+      if (!confirm('Удалить чат «' + f.dataset.title + '»? Это нельзя отменить.')) e.preventDefault();
+    });
+  }
+  document.querySelectorAll('.nav-chat-row').forEach(wireRow);
+  const closeMenus = () => document.querySelectorAll('.nav-chat-menu[open]').forEach((m) => { m.open = false; });
+  document.querySelectorAll('.nav-chats, .sidebar').forEach((el) => el.addEventListener('scroll', closeMenus));
+  window.addEventListener('resize', closeMenus);
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.nav-chat-menu')) document.querySelectorAll('.nav-chat-menu[open]').forEach((m) => { m.open = false; });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.querySelectorAll('.nav-chat-menu[open]').forEach((m) => { m.open = false; });
+  });
+
+  const form = document.getElementById('composer');
+  if (!form) return;
+  const box = document.getElementById('question'), thread = document.getElementById('chat-thread');
+  const scroller = document.getElementById('chat-scroll'), send = form.querySelector('.send');
+  const toBottom = () => { scroller.scrollTop = scroller.scrollHeight; };
+  const grow = () => { box.style.height = 'auto'; box.style.height = Math.min(box.scrollHeight, 200) + 'px'; };
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  toBottom();
+  box.addEventListener('input', grow);
+  box.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
+  });
+  document.querySelectorAll('.chip').forEach((chip) => chip.addEventListener('click', () => {
+    box.value = chip.dataset.question; form.requestSubmit();
+  }));
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const question = box.value.trim();
+    if (!question || send.disabled) return;
+    const welcome = document.getElementById('chat-welcome');
+    if (welcome) welcome.remove();
+    document.getElementById('chat').classList.add('has-msgs');
+    const pending = document.createElement('div');
+    pending.innerHTML = '<div class="msg msg-user"><div class="bubble">' + esc(question).replace(/\n/g, '<br>') + '</div></div>'
+      + '<div class="msg msg-bot"><div class="bot-avatar">◉</div><div class="bot-body"><div class="typing"><span></span><span></span><span></span></div></div></div>';
+    thread.appendChild(pending);
+    const data = new FormData(form);
+    box.value = ''; grow(); send.disabled = true; toBottom();
+    try {
+      const resp = await fetch(form.action, {method: 'POST', body: data, headers: {'X-Requested-With': 'fetch'}});
+      const json = await resp.json();
+      if (!resp.ok) throw new Error(json.error || 'Ошибка ' + resp.status);
+      pending.outerHTML = json.html;
+      if (json.created) {
+        form.action = json.send_url;
+        history.replaceState(null, '', json.url);
+        document.title = json.title + ' · Registry Demo';
+        const list = document.getElementById('chat-list');
+        document.querySelectorAll('.nav-chats .active').forEach((a) => a.classList.remove('active'));
+        if (list && json.nav_html) { list.insertAdjacentHTML('afterbegin', json.nav_html); wireRow(list.firstElementChild); }
+        box.placeholder = 'Ответить…';
+        const head = document.querySelector('.chat-head'), headTitle = document.getElementById('chat-title');
+        if (head) { head.hidden = false; headTitle.textContent = json.title; }
+        // короткое название от модели — отдельным запросом, ответ его не ждёт
+        fetch(json.title_url, {method: 'POST', headers: {'X-Requested-With': 'fetch', 'X-CSRFToken': csrf}})
+          .then((r) => r.ok ? r.json() : null)
+          .then((t) => { if (t && t.title) setTitle(json.chat_id, t.title); })
+          .catch(() => {});
+      }
+    } catch (err) {
+      pending.querySelector('.bot-body').innerHTML = '<div class="bot-error">Не удалось получить ответ: ' + esc(String(err.message || err)) + '. Попробуйте ещё раз.</div>';
+      box.value = question; grow();
+    } finally {
+      send.disabled = false; box.focus(); toBottom();
+    }
+  });
+  box.focus();
+})();
+</script>
+{% endblock %}

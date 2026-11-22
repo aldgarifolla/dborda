@@ -1,0 +1,16 @@
+<div class="nav-chat-row{% if current and c.pk == current.pk %} active{% endif %}" data-chat="{{ c.pk }}">
+  <a class="nav-chat" href="{% url 'assistant_chat' c.pk %}" title="{{ c.title }}">{{ c.title }}</a>
+  <details class="nav-chat-menu">
+    <summary aria-label="Действия с чатом «{{ c.title }}»" title="Переименовать или удалить">⋯</summary>
+    <div class="nav-chat-actions">
+      <form method="post" action="{% url 'assistant_rename' c.pk %}" class="nav-rename">{% csrf_token %}
+        <input name="title" value="{{ c.title }}" maxlength="120" aria-label="Новое название чата" required>
+        <button type="submit">Сохранить</button>
+      </form>
+      <form method="post" action="{% url 'assistant_delete' c.pk %}" class="nav-delete" data-title="{{ c.title }}">{% csrf_token %}
+        <input type="hidden" name="current" value="{{ current.pk|default:'' }}">
+        <button type="submit">Удалить чат</button>
+      </form>
+    </div>
+  </details>
+</div>

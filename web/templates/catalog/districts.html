@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Округа{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">ОКРУГА</p><h1>Региональные командования</h1><p class="sub">Сравнение доступных вам округов по одному показателю.</p></div></div>
+<div class="panel"><div class="panel-head"><div><h2>Сравнение: {{ metric_title }}</h2><p>Значения учебные (C)</p></div></div>
+<div class="switch-row">{% for key, title in metrics %}<a class="btn{% if key == metric %} primary{% endif %}" href="?metric={{ key }}">{{ title }}</a>{% endfor %}</div>
+{% if compare %}<div class="bars">{% for r in compare %}<div class="bar-row"><a class="bar-label" href="{% url 'district_detail' r.district_code %}">{{ r.short_name }}</a><div class="bar-track"><div class="bar-fill" style="width: {{ r.bar }}%"></div></div><span class="bar-value">{{ r.value|default:'—' }}</span></div>{% endfor %}</div>
+{% else %}<div class="empty">Нет доступных округов.</div>{% endif %}</div>
+<div class="panel"><h2>Все доступные округа</h2>
+{% if districts %}<div class="table-scroll"><table><thead><tr><th>Код</th><th>Округ</th><th>Штаб</th><th>Зона ответственности</th><th>Достоверность</th></tr></thead><tbody>{% for d in districts %}<tr><td class="mono">{{ d.district_code }}</td><td><a href="{% url 'district_detail' d.district_code %}">{{ d.short_name }}</a></td><td>{{ d.hq_city }}</td><td class="muted">{{ d.zone_note }}</td><td><span class="conf conf-{{ d.confidence }}">{{ d.confidence }}</span></td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">Нет выданных прав доступа к округам.</div>{% endif %}
+<p class="hint">Достоверность: A — дословно из нормативного акта, B — из СМИ или выведено из акта, C — учебное значение.</p></div>
+{% endblock %}

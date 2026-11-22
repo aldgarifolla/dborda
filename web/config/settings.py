@@ -56,6 +56,18 @@ DATABASES = {
 if os.environ.get('DJANGO_TEST_SQLITE') == '1':
     DATABASES['default'] = {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'}
 DATABASE_ROUTERS = ['catalog.router.SeparateDatabasesRouter']
+
+# Помощник: пусто — разбор по ключевым словам; 'catalog.assistant.ollama.OllamaPlanner' — локальная модель.
+ASSISTANT_PROVIDER = os.environ.get('ASSISTANT_PROVIDER', '')
+OLLAMA_URL = os.environ.get('OLLAMA_URL', 'http://host.docker.internal:11434')
+OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'qwen2.5:14b')
+OLLAMA_TIMEOUT = int(os.environ.get('OLLAMA_TIMEOUT', '120'))
+# Облачная модель через OpenAI-совместимый API (catalog.assistant.openai_compat): провайдер и модель.
+LLM_PROVIDER = os.environ.get('LLM_PROVIDER', '')
+LLM_MODEL = os.environ.get('LLM_MODEL', '')
+CLAUDE_MODEL = os.environ.get('CLAUDE_MODEL', 'claude-haiku-5-5')
+if os.environ.get('DJANGO_TEST_SQLITE') == '1':
+    ASSISTANT_PROVIDER = ''   # тесты не обращаются к модели
 LANGUAGE_CODE = 'ru'
 TIME_ZONE = 'Asia/Almaty'
 USE_TZ = True

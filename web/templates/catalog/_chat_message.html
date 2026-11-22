@@ -1,0 +1,11 @@
+{% load chat %}<div class="msg msg-user"><div class="bubble">{{ m.question|linebreaksbr }}</div></div>
+<div class="msg msg-bot">
+  <div class="bot-avatar" aria-hidden="true">◉</div>
+  <div class="bot-body">
+    <div class="bot-text">{{ m.text|chat_text }}</div>
+    {% if m.tables %}<details class="bot-data"><summary>Данные из базы · {{ m.tables|length }} {% if m.tables|length == 1 %}таблица{% elif m.tables|length < 5 %}таблицы{% else %}таблиц{% endif %}</summary>
+      {% for t in m.tables %}<div class="bot-table"><h4>{{ t.title }}</h4><div class="table-scroll"><table><thead><tr>{% for col in t.headers %}<th>{{ col }}</th>{% endfor %}</tr></thead><tbody>{% for row in t.rows %}<tr>{% for cell in row %}<td>{{ cell|default_if_none:'—' }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% if t.note %}<p class="muted">{{ t.note }}</p>{% endif %}<small class="muted">Источник: {{ t.source }}</small></div>{% endfor %}
+    </details>{% endif %}
+    <div class="bot-meta">{{ m.created_at|date:"H:i" }} · {{ m.mode|default:'—' }}{% if m.calls %} · {% for c in m.calls %}{{ c.tool }}{% if not c.ok %} (отказ){% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}</div>
+  </div>
+</div>

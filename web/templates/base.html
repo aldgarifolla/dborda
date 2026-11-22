@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <title>{% block title %}Registry Demo{% endblock %} · Registry Demo</title>
-  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=7">
 </head>
 <body>
 <div class="layout">
@@ -15,26 +15,26 @@
     <div class="sidebar-section">НАВИГАЦИЯ</div>
     <nav aria-label="Основная навигация">
       <a href="{% url 'dashboard' %}">⌂ <span>Обзор</span></a>
-      <a href="{% url 'unit_list' %}">▦ <span>Подразделения</span></a>
+      <a href="{% url 'district_list' %}">▦ <span>Округа</span></a>
       <a href="{% url 'items' %}">◫ <span>Каталог имущества</span></a>
-      <a href="{% url 'workbook' %}">▤ <span>Excel-модели</span></a>
-      <a href="{% url 'assistant' %}">◉ <span>Помощник</span></a>
+      <a href="{% url 'assistant' %}"{% if request.resolver_match.url_name|slice:":9" == 'assistant' %} class="active"{% endif %}>◉ <span>Помощник</span></a>
+      {% block nav_assistant %}{% endblock %}
       {% if user.demo_role.role == 'manager' %}<a href="{% url 'manage_grants' %}">♙ <span>Права доступа</span></a>{% endif %}
     </nav>
     <div class="sidebar-bottom">
       <div class="demo-label">УЧЕБНАЯ ВЕРСИЯ</div>
-      <p>Все записи и численность демонстрационные. Нет подключения к внешнему ИИ.</p>
+      <p>Названия, штабы и зоны округов — из открытых источников. Состав, численность, техника и запасы — учебные (C).</p>
       {% if user.is_authenticated %}
       <div class="userline"><span class="avatar">{{ user.username|first|upper }}</span><div><strong>{{ user.username }}</strong><small>{% if user.demo_role.role == 'manager' %}Manager{% else %}Viewer{% endif %}</small></div></div>
       <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="logout" type="submit">Выйти</button></form>
       {% endif %}
     </div>
   </aside>
-  <main class="content">
+  <main class="content {% block main_class %}{% endblock %}">
     <header class="topbar"><span>Закрытая учебная платформа</span><span class="pill">● Синтетические данные</span></header>
     {% if messages %}<div class="flash-stack">{% for message in messages %}<p class="flash">{{ message }}</p>{% endfor %}</div>{% endif %}
     {% block content %}{% endblock %}
-    <footer>Registry Demo · Локальный Django + PostgreSQL 16 · Только учебные данные</footer>
+    {% block footer %}<footer>Registry Demo · Локальный Django + PostgreSQL 16 · Только учебные данные</footer>{% endblock %}
   </main>
 </div>
 </body>

@@ -21,13 +21,13 @@ class PermissionSmokeTests(TestCase):
 
     def test_unauthenticated_redirects(self):
         self.client.logout()
-        response = self.client.get(reverse('unit_list'))
+        response = self.client.get(reverse('district_list'))
         self.assertEqual(response.status_code, 302)
         self.assertIn('/login/', response.url)
 
     @patch('catalog.views.repo.allowed_codes', return_value={'T.1.'})
-    def test_forbidden_unit_returns_404(self, mocked_scope):
-        response = self.client.get(reverse('unit_detail', kwargs={'code': 'T.2.'}))
+    def test_forbidden_district_returns_404(self, mocked_scope):
+        response = self.client.get(reverse('district_detail', kwargs={'code': 'T.2.'}))
         self.assertEqual(response.status_code, 404)
 
     def test_viewer_cannot_manage_grants(self):

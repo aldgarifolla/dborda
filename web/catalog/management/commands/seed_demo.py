@@ -6,22 +6,14 @@ from catalog.repository import select
 
 
 class Command(BaseCommand):
-    help = 'Создать двух учебных пользователей с разными областями доступа'
+    help = 'Создать двух учебных пользователей с разными областями доступа (по округам)'
 
     def handle(self, *args, **kwargs):
-        roots = select("""SELECT unit_code, short_name FROM registry_api.units
-                          WHERE country='РК' ORDER BY length(unit_code), unit_code LIMIT 1""")
-        if not roots:
-            raise RuntimeError('Нет учебного корня РК')
-        manager_code = roots[0]['unit_code']
-        children = select('''SELECT unit_code, short_name FROM registry_api.units
-                             WHERE parent_code=%s ORDER BY unit_code LIMIT 1''', [manager_code])
-        viewer_code = children[0]['unit_code'] if children else manager_code
+        codes = [r['district_code'] for r in select('SELECT district_code FROM registry_api.districts ORDER BY sort_order')]
+        if not codes:
+            raise RuntimeError('В базе нет учебных округов: сначала примените build/stages/70_districts.sql')
         users = get_user_model()
-        for name, role, root_code in (
-            ('demo_manager', 'manager', manager_code),
-            ('demo_viewer', 'viewer', viewer_code),
-        ):
+        for name, role, granted in (('demo_manager', 'manager', codes), ('demo_viewer', 'viewer', codes[:1])):
             user, created = users.objects.get_or_create(username=name)
             if created:
                 password = secrets.token_urlsafe(18)
@@ -31,7 +23,9 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(f'{name} уже существует; пароль оставлен прежним.')
             UserRole.objects.update_or_create(user=user, defaults={'role': role})
-            UnitGrant.objects.update_or_create(user=user, root_code=root_code,
-                                                defaults={'is_active': True})
-            self.stdout.write(f'  Доступ от подразделения: {root_code}')
+            # права на узлы прежней подробной структуры больше не действуют
+            UnitGrant.objects.filter(user=user).exclude(root_code__in=granted).update(is_active=False)
+            for code in granted:
+                UnitGrant.objects.update_or_create(user=user, root_code=code, defaults={'is_active': True})
+            self.stdout.write(f'  Доступ к округам: {", ".join(granted)}')
         self.stdout.write('Учебные пользователи созданы. Сохраните новые пароли локально.')
