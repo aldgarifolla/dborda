@@ -10,6 +10,6 @@
 </div></div>
 <div class="panel"><h2>Характеристики</h2>
 {% if specs %}<div class="table-scroll"><table><thead><tr><th>Параметр</th><th>Значение</th><th>Достоверность</th><th>Источник</th><th>Примечание</th></tr></thead><tbody>{% for s in specs %}<tr><td>{{ s.param_name }}</td><td>{% if s.value_num is not None %}{{ s.value_num }}{% else %}{{ s.value_text }}{% endif %} {{ s.unit|default:'' }}</td><td><span class="conf conf-{{ s.confidence }}">{{ s.confidence }}</span></td><td>{{ s.source_name|default:'—' }}</td><td class="muted">{{ s.note|default:'' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty">Характеристики для этого образца не заполнены.</div>{% endif %}</div>
-<div class="panel"><h2>Наличие по округам</h2><p class="muted">Учебная модель (C), только доступные вам округа.</p>
+<div class="panel"><h2>Наличие по округам</h2><p class="muted">Только доступные вам округа.</p>
 {% if holders %}<div class="table-scroll"><table><thead><tr><th>Округ</th><th class="num">Количество</th><th>Ед.</th></tr></thead><tbody>{% for h in holders %}<tr><td><a href="{% url 'district_detail' h.district_code %}?tab=equipment">{{ h.short_name }}</a></td><td class="num">{{ h.qty|num }}</td><td>{{ h.unit_measure|default:'' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty">В доступных округах образец не числится.</div>{% endif %}</div>
 {% endblock %}

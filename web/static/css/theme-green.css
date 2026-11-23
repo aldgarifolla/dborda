@@ -42,10 +42,13 @@
 
 /* Фон-карта ГИС (scripts/make_map_svg.py): горизонтали по рельефу, подписи высот, сетка, река, дорога */
 @media (min-width:721px){
-  body{background-color:var(--paper);background-image:url('../img/map-page.svg?v=2');background-size:cover;
+  body{background-color:var(--paper);background-image:url('../img/map-page.svg?v=3');background-size:cover;
        background-position:center;background-repeat:no-repeat;background-attachment:fixed}
-  .sidebar{background-color:var(--ink);background-image:url('../img/map-sidebar.svg?v=2');background-size:cover;
+  .sidebar{background-color:var(--ink);background-image:url('../img/map-sidebar.svg?v=3');background-size:cover;
            background-position:center;background-repeat:no-repeat}
 }
-.login-split .login-main{background-image:url('../img/map-page.svg?v=2');background-size:cover;background-position:center}
-.login-side{background-image:url('../img/map-sidebar.svg?v=2');background-size:cover;background-position:center}
+.login-split .login-main{background-image:url('../img/map-page.svg?v=3');background-size:cover;background-position:center}
+.login-side{background-image:url('../img/map-sidebar.svg?v=3');background-size:cover;background-position:center}
+
+/* верхняя полоса без текста — без линии */
+.topbar:empty{border-bottom:0}

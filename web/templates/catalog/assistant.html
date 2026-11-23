@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% block title %}{% if chat %}{{ chat.title }}{% else %}Помощник{% endif %}{% endblock %}
+{% extends 'base.html' %}{% block title %}{% if chat %}{{ chat.title }}{% else %}Saqshy{% endif %}{% endblock %}
 {% block main_class %}chat-mode{% endblock %}{% block footer %}{% endblock %}
 {% block nav_assistant %}<div class="nav-chats">
   <a class="nav-chat nav-chat-new{% if not chat %} active{% endif %}" href="{% url 'assistant' %}">＋ Новый чат</a>
@@ -24,7 +24,7 @@
       <textarea id="question" name="question" rows="1" maxlength="500"{% if limit.reached %} disabled{% endif %} placeholder="{% if chat %}Ответить…{% else %}Спросите про округа, бригады, технику или запасы{% endif %}" required aria-label="Вопрос"></textarea>
       <button type="submit" class="send" aria-label="Отправить" title="Отправить (Enter)"{% if limit.reached %} disabled{% endif %}>↑</button>
     </div>
-    <p class="composer-note">{% if limit.limit %}<span class="limit-note{% if limit.reached %} warn{% endif %}" id="limit-note" data-limit="{{ limit.limit }}">{% if limit.reached %}Лимит {{ limit.limit }} вопросов на сегодня исчерпан — новые вопросы после 00:00.{% else %}Сегодня задано {{ limit.used }} из {{ limit.limit }} вопросов, осталось {{ limit.left }}. Счётчик обнуляется в 00:00.{% endif %}</span><br>{% endif %}Enter — отправить, Shift+Enter — новая строка. Числа берутся из учебной базы, SQL помощник не пишет.</p>
+    <p class="composer-note">{% if limit.limit %}<span class="limit-note{% if limit.reached %} warn{% endif %}" id="limit-note" data-limit="{{ limit.limit }}">{% if limit.reached %}Лимит {{ limit.limit }} вопросов на сегодня исчерпан — новые вопросы после 00:00.{% else %}Сегодня задано {{ limit.used }} из {{ limit.limit }} вопросов, осталось {{ limit.left }}. Счётчик обнуляется в 00:00.{% endif %}</span><br>{% endif %}Enter — отправить, Shift+Enter — новая строка.</p>
   </form>{% endif %}
 </div>
 <script>

@@ -1,15 +1,15 @@
 {% extends 'base.html' %}
 {% block title %}Обзор{% endblock %}
 {% block content %}
-<div class="page-heading"><div><p class="eyebrow">ГЛАВНАЯ</p><h1>Обзор по округам</h1><p class="sub">Сводка только по округам, разрешённым вашему аккаунту.</p></div><a class="btn primary" href="{% url 'assistant' %}">Открыть помощника</a></div>
+<div class="page-heading"><div><p class="eyebrow">ГЛАВНАЯ</p><h1>Обзор по округам</h1><p class="sub">Сводка только по округам, разрешённым вашему аккаунту.</p></div><a class="btn primary" href="{% url 'assistant' %}">Открыть Saqshy</a></div>
 <div class="stats">
   <div class="stat"><span>Доступных округов</span><strong>{{ counts.districts|num }}</strong><small>по вашим правам доступа</small></div>
-  <div class="stat"><span>Соединений</span><strong>{{ counts.formations|num }}</strong><small>условных, учебные</small></div>
-  <div class="stat"><span>Численность</span><strong>{{ counts.personnel|num }}</strong><small>учебная модель, чел.</small></div>
-  <div class="stat"><span>Техника и вооружение</span><strong>{{ counts.equipment_units|num }}</strong><small>учебная модель, ед.</small></div>
+  <div class="stat"><span>Соединений</span><strong>{{ counts.formations|num }}</strong><small>в доступных округах</small></div>
+  <div class="stat"><span>Численность</span><strong>{{ counts.personnel|num }}</strong><small>чел.</small></div>
+  <div class="stat"><span>Техника и вооружение</span><strong>{{ counts.equipment_units|num }}</strong><small>ед.</small></div>
 </div>
-<div class="panel"><div class="panel-head"><div><h2>Округа</h2><p>Учебные округа на месте региональных командований ВС РК</p></div><a href="{% url 'district_list' %}" class="text-link">Сравнить округа</a></div>
+<div class="panel"><div class="panel-head"><div><h2>Округа</h2><p>Региональные командования ВС РК</p></div><a href="{% url 'district_list' %}" class="text-link">Сравнить округа</a></div>
 {% if districts %}<div class="table-scroll"><table><thead><tr><th>Код</th><th>Округ</th><th>Штаб</th><th class="num">Соединений</th><th class="num">Численность</th><th class="num">Обеспеченность, %</th></tr></thead><tbody>{% for d in districts %}<tr><td class="mono">{{ d.district_code }}</td><td><a href="{% url 'district_detail' d.district_code %}">{{ d.short_name }}</a></td><td>{{ d.hq_city }}</td><td class="num">{{ d.formations|num }}</td><td class="num">{{ d.personnel_total|num }}</td><td class="num">{{ d.supply_pct|num|default:'—' }}</td></tr>{% endfor %}</tbody></table></div>
 {% else %}<div class="empty">Нет выданных прав доступа к округам. Обратитесь к менеджеру.</div>{% endif %}</div>
-<div class="notice"><strong>О данных</strong> · Названия, города штабов и зоны ответственности взяты из открытых источников (указы № 1085 от 2003 г. и № 354 от 2012 г., СМИ). Действующее распределение не опубликовано. Состав соединений, численность, техника и запасы — учебные значения (достоверность C), это не реальные данные ВС РК.</div>
+<div class="notice"><strong>О данных</strong> · Названия, города штабов и зоны ответственности взяты из открытых источников (указы № 1085 от 2003 г. и № 354 от 2012 г., СМИ). Действующее распределение не опубликовано.</div>
 {% endblock %}

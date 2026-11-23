@@ -3,18 +3,18 @@
 {% block content %}
 <div class="breadcrumb"><a href="{% url 'district_list' %}">Округа</a><span>/</span><a href="{% url 'district_detail' d.district_code %}">{{ d.short_name }}</a><span>/</span><span>{{ f.formation_code }}</span></div>
 {% include 'catalog/_ladder.html' %}
-<div class="page-heading"><div><p class="eyebrow">СОЕДИНЕНИЕ · {{ f.formation_code }}</p><h1>{{ f.formation_name }}</h1><p class="sub">{{ f.formation_type }} · {{ d.short_name }}</p></div><span class="pill">Учебные данные (C)</span></div>
+<div class="page-heading"><div><p class="eyebrow">СОЕДИНЕНИЕ · {{ f.formation_code }}</p><h1>{{ f.formation_name }}</h1><p class="sub">{{ f.formation_type }} · {{ d.short_name }}</p></div></div>
 <div class="stats">
   <div class="stat"><span>Личный состав</span><strong>{{ f.personnel|num }}</strong><small>офицеров {{ f.officers }} · сержантов {{ f.sergeants }} · солдат {{ f.soldiers }}</small></div>
   <div class="stat"><span>Техника</span><strong>{{ f.equipment_units|num }}</strong><small>ед., без стрелкового оружия</small></div>
   <div class="stat"><span>Батальонов · рот</span><strong>{{ f.battalions }} · {{ f.companies }}</strong><small>в т. ч. дивизионы и батареи</small></div>
-  <div class="stat"><span>Взводов · отделений</span><strong>{{ f.platoons }} · {{ f.squads }}</strong><small>учебный шаблон (C)</small></div>
+  <div class="stat"><span>Взводов · отделений</span><strong>{{ f.platoons }} · {{ f.squads }}</strong><small>по схеме «всё по три»</small></div>
 </div>
 {% include 'catalog/_unit_tabs.html' %}
 {% if tab == 'summary' %}
-<div class="panel"><h2>Состав бригады</h2><p class="muted">Учебная модель «всё по три»: 3 батальона (в артиллерии — дивизиона), в каждом 3 роты, в роте 3 взвода, во взводе 3 отделения. Нажмите на батальон, чтобы открыть уровень ниже. Численность и техника считаются снизу вверх: отделения плюс командиры своих уровней.</p>
+<div class="panel"><h2>Состав бригады</h2><p class="muted">Схема «всё по три»: 3 батальона (в артиллерии — дивизиона), в каждом 3 роты, в роте 3 взвода, во взводе 3 отделения. Нажмите на батальон, чтобы открыть уровень ниже. Численность и техника считаются снизу вверх: отделения плюс командиры своих уровней.</p>
 {% include 'catalog/_subunits.html' %}</div>
-<div class="panel"><h2>Откуда данные</h2><p class="muted">Штаты ВС РК не опубликованы. Состав подразделений — типовой, по открытым источникам; звания — по системе ВС РК. Это упрощённая учебная модель: в ней нет управления бригады, бригадной артиллерии и ПВО, подразделений обеспечения, поэтому численность намного ниже реальной (в источнике отдельная мотострелковая бригада — около 4000 чел.; рота 92 чел. против 103–110, батарея 40 против 60).</p>
+<div class="panel"><h2>Откуда данные</h2><p class="muted">Штаты ВС РК не опубликованы. Состав подразделений — типовой, по открытым источникам; звания — по системе ВС РК. Это упрощённая модель: в ней нет управления бригады, бригадной артиллерии и ПВО, подразделений обеспечения, поэтому численность намного ниже реальной (в источнике отдельная мотострелковая бригада — около 4000 чел.; рота 92 чел. против 103–110, батарея 40 против 60).</p>
 <div class="table-scroll"><table><thead><tr><th>Код</th><th>Источник</th><th>Достоверность</th></tr></thead><tbody>{% for s in sources %}<tr><td class="mono">{{ s.source_code }}</td><td>{% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ s.title }}</a>{% else %}{{ s.title }}{% endif %}</td><td><span class="conf conf-{{ s.confidence }}">{{ s.confidence }}</span></td></tr>{% endfor %}</tbody></table></div></div>
 {% endif %}
 {% endblock %}

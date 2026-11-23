@@ -12,8 +12,9 @@ from pathlib import Path
 OUT = Path(__file__).resolve().parents[1] / 'web' / 'static' / 'img'
 
 
-def field(hills, waves):
+def field(hills, waves, zoom=1.0):
     def h(x, y):
+        x, y = x * zoom, y * zoom   # zoom > 1: рельеф мельче (виден больший участок)
         v = 0.0
         for cx, cy, amp, sx, sy in hills:
             v += amp * math.exp(-(((x - cx) / sx) ** 2 + ((y - cy) / sy) ** 2))
@@ -91,8 +92,8 @@ def path(line, closed=False):
     return d
 
 
-def build(width, height, hills, waves, step, interval, colors, labels=True, grid=True, river=None, road=None):
-    h = field(hills, waves)
+def build(width, height, hills, waves, step, interval, colors, zoom=1.0, labels=True, grid=True, river=None, road=None):
+    h = field(hills, waves, zoom)
     values = [h(x, y) for x in range(0, width, 40) for y in range(0, height, 40)]
     lo, hi = min(values), max(values)
     first = math.ceil(lo / interval) * interval
@@ -120,7 +121,7 @@ def build(width, height, hills, waves, step, interval, colors, labels=True, grid
         is_index = round(level / interval) % 5 == 0
         for line in lines[level]:
             out.append(f"<path d='{path(line)}' stroke='{index_stroke if is_index else stroke}' "
-                       f"stroke-width='{1.4 if is_index else 0.8}'/>")
+                       f"stroke-width='{1.0 if is_index else 0.6}'/>")
             if is_index and labels and len(line) > 60:
                 mid = line[len(line) // 2]
                 if all(abs(mid[0] - x) + abs(mid[1] - y) > 260 for x, y, _ in label_spots):
@@ -131,7 +132,7 @@ def build(width, height, hills, waves, step, interval, colors, labels=True, grid
     if road:
         out.append(f"<path d='{road}' fill='none' stroke='{road_stroke}' stroke-width='1.3' stroke-dasharray='7 5'/>")
     if labels:
-        out.append(f"<g fill='{text_fill}' font-family='IBM Plex Mono,monospace' font-size='10' text-anchor='middle'>")
+        out.append(f"<g fill='{text_fill}' font-family='IBM Plex Mono,monospace' font-size='9' text-anchor='middle'>")
         for x, y, level in label_spots:
             out.append(f"<text x='{x:.0f}' y='{y + 3:.0f}' paint-order='stroke' stroke='#F3F5F6' stroke-width='3'>"
                        f"{int(200 + level * 2)}</text>")
@@ -147,7 +148,7 @@ def main():
         hills=[(260, 230, 60, 230, 170), (760, 640, 75, 260, 210), (1330, 260, 55, 210, 160), (1180, 820, 40, 200, 140),
                (560, 120, 30, 160, 110), (90, 820, 35, 180, 150), (1500, 620, 28, 150, 170), (980, 330, -30, 180, 120)],
         waves=[(0.004, 0.003, 0.7, 6), (0.0025, -0.005, 1.9, 5), (0.009, 0.006, 2.6, 2.2)],
-        step=8, interval=10,
+        step=8, interval=10, zoom=1.4,
         colors=('rgba(18,52,56,.075)', 'rgba(18,52,56,.14)', 'rgba(18,52,56,.30)', 'rgba(18,52,56,.05)',
                 'rgba(63,138,150,.30)', 'rgba(18,52,56,.16)'),
         river='M -20 560 C 160 520 300 600 430 540 S 640 420 820 470 S 1060 600 1220 540 S 1450 430 1620 470',
@@ -158,7 +159,7 @@ def main():
         320, 1000,
         hills=[(120, 180, 50, 140, 120), (230, 560, 60, 160, 170), (60, 860, 40, 130, 120)],
         waves=[(0.012, 0.004, 0.3, 4), (0.006, -0.009, 2.1, 3)],
-        step=6, interval=10,
+        step=6, interval=10, zoom=1.4,
         colors=('rgba(255,255,255,.055)', 'rgba(255,255,255,.10)', 'rgba(255,255,255,.18)', 'rgba(255,255,255,.035)',
                 'rgba(159,208,208,.22)', 'rgba(255,255,255,.10)'),
         labels=False, grid=False,

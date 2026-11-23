@@ -21,7 +21,7 @@
        background-size:24px 24px;background-attachment:fixed}
 
   /* ---------------------------------------------------------------- боковая панель: тушь и горизонтали */
-  .layout{grid-template-columns:248px minmax(0,1fr)}
+  .layout{grid-template-columns:286px minmax(0,1fr)}
   .sidebar{background-color:var(--ink);padding:20px 14px;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='340' viewBox='0 0 260 340'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.06' stroke-width='1'%3E%3Cpath d='M-20 250 C40 190 90 230 140 200 S230 120 290 160'/%3E%3Cpath d='M-20 275 C45 215 95 255 145 228 S235 150 290 188'/%3E%3Cpath d='M-20 300 C50 242 100 282 150 256 S240 180 290 216'/%3E%3Cpath d='M-20 325 C55 268 105 308 155 284 S245 210 290 244'/%3E%3Cpath d='M60 330 C90 300 130 318 160 300 S220 262 260 280'/%3E%3Cellipse cx='190' cy='92' rx='38' ry='22'/%3E%3Cellipse cx='190' cy='92' rx='62' ry='38'/%3E%3Cellipse cx='190' cy='92' rx='88' ry='56'/%3E%3C/g%3E%3C/svg%3E");
     background-repeat:no-repeat;background-position:left bottom;background-size:260px auto}

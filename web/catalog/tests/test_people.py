@@ -47,7 +47,7 @@ class PeoplePagesTests(TestCase):
 
     def test_person_card(self):
         page = self.client.get(reverse('person_detail', args=['ЛН-007791'])).content.decode()
-        for text in ('Калиев Еркебулан Нуржанович', 'сержант третьего класса', 'Вымышленный человек', '0(I) Rh+'):
+        for text in ('Калиев Еркебулан Нуржанович', 'сержант третьего класса', '0(I) Rh+'):
             self.assertIn(text, page)
 
     def test_unknown_or_foreign_person_is_404(self):
