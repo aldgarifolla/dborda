@@ -101,7 +101,7 @@ def regions(code, scope):
 def formations(code, scope):
     if code not in scope:
         return []
-    return select('''SELECT formation_code, formation_name, formation_type, scale, origin,
+    return select('''SELECT formation_code, formation_name, formation_type, origin,
                             battalions, companies, platoons, squads, personnel, equipment_units
                      FROM registry_api.district_formations WHERE district_code = %s ORDER BY formation_code''', [code])
 
@@ -111,7 +111,7 @@ def get_formation(formation_code, scope):
     if not scope:
         return None
     rows = select('''SELECT f.formation_code, f.district_code, d.short_name AS district_name, f.formation_name,
-                         f.formation_type, f.scale, f.origin, f.battalions, f.companies, f.platoons, f.squads,
+                         f.formation_type, f.origin, f.battalions, f.companies, f.platoons, f.squads,
                          f.personnel, f.officers, f.sergeants, f.soldiers, f.equipment_units
                   FROM registry_api.district_formations f JOIN registry_api.districts d USING (district_code)
                   WHERE f.formation_code = %s AND f.district_code = ANY(%s::text[])''', [formation_code, list(scope)])
@@ -153,25 +153,93 @@ def unit_staff(code, scope, own_only=False):
                       ORDER BY {CATEGORY_ORDER}, sum(qty) DESC, position_name''', [code, like_prefix(code), list(scope)])
 
 
-PEOPLE_COLUMNS = ('subunit_code, subunit_name, level, seq, seat, position_name, rank_name, rank_category, '
+def search_words(term, limit=4):
+    """Слова запроса по основам: «командир батальона» -> «командир», «батальо» — найдёт
+    «Командир механизированного батальона». Короткие слова (до 3 букв) пропускаются."""
+    words = [w for w in str(term or '').replace('ё', 'е').split() if len(w) > 3 or w.upper().startswith('ЛН')]
+    return [w if w.upper().startswith('ЛН') else w[:max(4, int(len(w) * 0.75))] for w in words][:limit]
+
+
+PEOPLE_COLUMNS = ('subunit_code, subunit_name, formation_code, level, seq, seat, position_name, rank_name, rank_category, '
                   'personal_number, full_name, age, service_type, nationality')
+PEOPLE_CATEGORIES = ('офицеры', 'сержанты', 'солдаты')
+PEOPLE_SERVICES = ('срочная воинская служба', 'по контракту')
 
 
-def unit_people(code, scope, page=1, term=''):
-    """Вымышленный личный состав подразделения вместе с подчинёнными: (строки страницы, всего).
-    term — поиск по ФИО, должности или личному номеру."""
+def unit_people(code, scope, page=1, term='', category='', service='', district=''):
+    """Вымышленный личный состав подразделения вместе с подчинёнными (или всего округа, если задан district):
+    (строки страницы, всего). term — поиск по ФИО, должности или личному номеру; category — офицеры/сержанты/солдаты;
+    service — срочная воинская служба / по контракту."""
     if not scope:
         return [], 0
     page, offset = page_bounds(page)
-    where = '(subunit_code = %s OR subunit_code LIKE %s) AND district_code = ANY(%s::text[])'
-    args = [code, like_prefix(code), list(scope)]
-    if term.strip():
+    if district:
+        where, args = 'district_code = %s AND district_code = ANY(%s::text[])', [district, list(scope)]
+    else:
+        where = '(subunit_code = %s OR subunit_code LIKE %s) AND district_code = ANY(%s::text[])'
+        args = [code, like_prefix(code), list(scope)]
+    for word in search_words(term):             # каждое слово (по основе) — в ФИО, должности или личном номере
         where += ' AND (full_name ILIKE %s OR position_name ILIKE %s OR personal_number ILIKE %s)'
-        args += [like(term)] * 3
+        args += [like(word)] * 3
+    if category in PEOPLE_CATEGORIES:
+        where += ' AND rank_category = %s'
+        args.append(category)
+    if service in PEOPLE_SERVICES:
+        where += ' AND service_type = %s'
+        args.append(service)
     total = select(f'SELECT count(*) AS n FROM registry_api.subunit_people WHERE {where}', args)[0]['n']
     rows = select(f'SELECT {PEOPLE_COLUMNS} FROM registry_api.subunit_people WHERE {where} '
                   'ORDER BY subunit_code, seq, seat LIMIT %s OFFSET %s', args + [PAGE_SIZE, offset])
     return rows, total
+
+
+def people_search(text, scope, limit=15):
+    """Люди по ФИО (любая часть) или личному номеру, только в доступных округах. Старшие звания первыми."""
+    text = str(text or '').strip()[:60]
+    if not scope or not text:
+        return []
+    words = [w for w in text.split() if w][:3]
+    where = ' AND '.join(['(full_name ILIKE %s OR personal_number ILIKE %s)'] * len(words))
+    args = [x for w in words for x in (like(w), like(w))]
+    return select(f'''SELECT {PEOPLE_COLUMNS}, district_code FROM registry_api.subunit_people
+                      WHERE {where} AND district_code = ANY(%s::text[])
+                      ORDER BY rank_order DESC, full_name LIMIT %s''', args + [list(scope), limit])
+
+
+PEOPLE_GROUPS = {
+    'category': 'rank_category', 'service': 'service_type', 'nationality': 'nationality', 'education': 'education',
+    'rank': 'rank_name', 'marital': 'marital_status', 'fitness': 'fitness_category', 'blood': 'blood_group',
+    'age': "CASE WHEN age < 21 THEN '18–20' WHEN age < 26 THEN '21–25' WHEN age < 31 THEN '26–30' "
+           "WHEN age < 41 THEN '31–40' ELSE '41 и старше' END",
+}
+
+
+def people_stats(scope, group_by='category', code='', district=''):
+    """Распределение личного состава (подразделение с подчинёнными, округ или все доступные округа):
+    [{'value', 'people', 'avg_age'}], отсортировано по числу людей."""
+    if not scope:
+        return []
+    expr = PEOPLE_GROUPS.get(group_by, PEOPLE_GROUPS['category'])
+    where, args = 'district_code = ANY(%s::text[])', [list(scope)]
+    if district:
+        where += ' AND district_code = %s'
+        args.append(district)
+    if code:
+        where += ' AND (subunit_code = %s OR subunit_code LIKE %s)'
+        args += [code, like_prefix(code)]
+    return select(f'''SELECT {expr} AS value, count(*) AS people, round(avg(age), 1) AS avg_age
+                      FROM registry_api.subunit_people WHERE {where}
+                      GROUP BY 1 ORDER BY 2 DESC, 1''', args)
+
+
+def catalog_categories():
+    return select(f'''SELECT category, count(*) AS items FROM registry_api.items WHERE {OWN_ITEMS}
+                      GROUP BY 1 ORDER BY 1''')
+
+
+def catalog_items(category):
+    return select(f'''SELECT item_sname, item_name, unit_measure FROM registry_api.items
+                      WHERE category ILIKE %s AND {OWN_ITEMS} ORDER BY item_sname''', [like(category)])
 
 
 def get_person(personal_number, scope):
@@ -325,11 +393,16 @@ def item_holders(item_sname, scope):
 
 
 # ---------------------------------------------------------------- каталог имущества (общий справочник)
+# Сайт ORDA показывает только образцы своей армии: техника условного противника (США) остаётся в базе
+# для основной версии, но в каталог, поиск и карточки здесь не попадает.
+OWN_ITEMS = "coalesce(manufacturer_country, '') <> 'США'"
+
+
 def item_catalog(term='', page=1):
     """Возвращает (строки страницы, всего строк)."""
     page, offset = page_bounds(page)
     pat = like(term)
-    where = 'item_sname ILIKE %s OR item_name ILIKE %s OR category ILIKE %s'
+    where = f'(item_sname ILIKE %s OR item_name ILIKE %s OR category ILIKE %s) AND {OWN_ITEMS}'
     total = select(f'SELECT count(*) AS n FROM registry_api.items WHERE {where}', [pat, pat, pat])[0]['n']
     rows = select(f'''SELECT item_sname, item_name, category, unit_measure FROM registry_api.items
                       WHERE {where} ORDER BY category, item_sname LIMIT %s OFFSET %s''',
@@ -343,19 +416,21 @@ def find_items(text, limit=8):
     if not text:
         return []
     pat = like(text)
-    return select('''SELECT DISTINCT i.item_sname, i.item_name, i.category, i.unit_measure,
-                            (lower(i.item_sname) = lower(%s) OR lower(a.alias) = lower(%s)) AS exact
-                     FROM registry_api.items i LEFT JOIN registry_api.item_aliases a USING (item_sname)
-                     WHERE i.item_sname ILIKE %s OR i.item_name ILIKE %s OR a.alias ILIKE %s
-                     ORDER BY exact DESC, i.item_sname LIMIT %s''', [text, text, pat, pat, pat, limit])
+    return select(f'''SELECT DISTINCT i.item_sname, i.item_name, i.category, i.unit_measure,
+                             (lower(i.item_sname) = lower(%s) OR lower(a.alias) = lower(%s)) AS exact
+                      FROM registry_api.items i LEFT JOIN registry_api.item_aliases a USING (item_sname)
+                      WHERE (i.item_sname ILIKE %s OR i.item_name ILIKE %s OR a.alias ILIKE %s) AND coalesce(i.manufacturer_country, '') <> 'США'
+                      ORDER BY exact DESC, i.item_sname LIMIT %s''', [text, text, pat, pat, pat, limit])
 
 
 def get_item(item_sname):
-    rows = select('''SELECT item_sname, item_name, category, manufacturer_country, unit_measure
-                     FROM registry_api.items WHERE item_sname = %s''', [item_sname])
+    rows = select(f'''SELECT item_sname, item_name, category, manufacturer_country, unit_measure
+                      FROM registry_api.items WHERE item_sname = %s AND {OWN_ITEMS}''', [item_sname])
     return rows[0] if rows else None
 
 
 def item_specs(item_sname):
-    return select('''SELECT param_name, value_num, value_text, unit, confidence, source_code, source_name, note
+    # «этап 71» — служебная метка сборки каталога, на странице её не показываем
+    return select('''SELECT param_name, value_num, value_text, unit, confidence, source_code, source_name,
+                            NULLIF(note, 'этап 71') AS note
                      FROM registry_api.item_specs WHERE item_sname = %s ORDER BY param_name, confidence''', [item_sname])

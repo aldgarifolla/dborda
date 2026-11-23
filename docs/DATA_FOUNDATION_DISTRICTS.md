@@ -163,7 +163,7 @@
 | Схема | Назначение | Основные объекты (PK) |
 |---|---|---|
 | `mil_core` | импорт модели ПМИ + генерация | `unit (unit_code)`, `staff_position (staff_id)`, `person (person_id)`, `person_profile (person_id)`, `rank (rank_name)`, `position (position_name)`, `item (item_sname)`, `holding (unit_code, item_sname)`, `vehicle (vehicle_id)`, `warehouse (warehouse_id)`, `stock_movement (movement_id)`; всего 30 таблиц, 46 FK |
-| `district` | сводная модель по округам (этап `70_districts.sql`); вымышленный личный состав — `person`, `person_post` (этап `72_district_people.sql`, запускать после 70: тот пересоздаёт схему) | `district (district_code)`, `formation (formation_code)`, `strength (district_code, category)`, `equipment (district_code, item_sname)`, `supply (district_code, item_sname)` |
+| `district` | сводная модель по округам (этап `70_districts.sql`); вымышленный личный состав — `person`, `person_post` (там же, в одной транзакции) | `district (district_code)`, `formation (formation_code)`, `strength (district_code, category)`, `equipment (district_code, item_sname)`, `supply (district_code, item_sname)` |
 | `refdata` | справочники | `kz_regional_command (rc_code)`, `kz_rc_region (region_name)`, `kz_rc_source (source_code)`, `workbook_sheet (sheet_name)`, `workbook_row (row_id)`, `reference_entry (entry_id)` |
 | `etl`, `excel_stage` | журнал загрузок | `load_run (run_id)`, `reject (reject_id)`, `reconcile`, `raw_row` |
 | `registry_api` | представления только для чтения (для Django) | `districts`, `district_regions`, `district_formations`, `district_strength`, `district_equipment`, `district_supply`, `items`, `item_specs`, `item_aliases`, `sources` и прежние `units`, `staff_positions`, `holdings` |

@@ -1,0 +1,3 @@
+{% extends 'base.html' %}{% block title %}Страница не найдена{% endblock %}
+{% block content %}<div class="page-heading"><div><p class="eyebrow">ОШИБКА 404</p><h1>Страница не найдена</h1><p class="sub">Такой страницы нет или у вас нет доступа к этим данным.</p></div></div>
+<div class="panel"><p>Проверьте адрес или вернитесь к разделам:</p><div class="tag-list"><a class="btn" href="{% url 'dashboard' %}">Обзор</a><a class="btn" href="{% url 'district_list' %}">Округа</a><a class="btn" href="{% url 'items' %}">Каталог имущества</a><a class="btn" href="{% url 'assistant' %}">Помощник</a></div></div>{% endblock %}

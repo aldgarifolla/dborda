@@ -5,27 +5,30 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>{% block title %}Registry Demo{% endblock %} · Registry Demo</title>
-  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=7">
+  <title>{% block title %}ORDA{% endblock %} · ORDA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=8">
+  <link rel="stylesheet" href="{% static 'css/theme.css' %}?v=2">
 </head>
 <body>
 <div class="layout">
   <aside class="sidebar">
-    <a class="brand" href="{% url 'dashboard' %}"><span class="brand-mark">R</span><span>Registry <small>Demo</small></span></a>
+    <a class="brand" href="{% url 'dashboard' %}"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 120 120"><g fill="#FFFFFF"><rect x="15" y="22" width="90" height="14" rx="4"/><rect x="30" y="53" width="60" height="14" rx="4"/><rect x="45" y="84" width="30" height="14" rx="4"/></g></svg></span><span>ORDA <small>учебная система</small></span></a>
     <div class="sidebar-section">НАВИГАЦИЯ</div>
-    <nav aria-label="Основная навигация">
-      <a href="{% url 'dashboard' %}">⌂ <span>Обзор</span></a>
-      <a href="{% url 'district_list' %}">▦ <span>Округа</span></a>
-      <a href="{% url 'items' %}">◫ <span>Каталог имущества</span></a>
-      <a href="{% url 'assistant' %}"{% if request.resolver_match.url_name|slice:":9" == 'assistant' %} class="active"{% endif %}>◉ <span>Помощник</span></a>
+    <nav aria-label="Основная навигация">{% with n=request.resolver_match.url_name|default:'' %}
+      <a href="{% url 'dashboard' %}"{% if n == 'dashboard' %} class="active" aria-current="page"{% endif %}>⌂ <span>Обзор</span></a>
+      <a href="{% url 'district_list' %}"{% if n == 'district_list' or n == 'district_detail' or n == 'formation_detail' or n == 'subunit_detail' or n == 'person_detail' %} class="active" aria-current="page"{% endif %}>▦ <span>Округа</span></a>
+      <a href="{% url 'items' %}"{% if n == 'items' or n == 'item_detail' %} class="active" aria-current="page"{% endif %}>◫ <span>Каталог имущества</span></a>
+      <a href="{% url 'assistant' %}"{% if n|slice:":9" == 'assistant' %} class="active" aria-current="page"{% endif %}>◉ <span>Помощник</span></a>
       {% block nav_assistant %}{% endblock %}
-      {% if user.demo_role.role == 'manager' %}<a href="{% url 'manage_grants' %}">♙ <span>Права доступа</span></a>{% endif %}
+      {% if user.demo_role.role == 'manager' %}<a href="{% url 'manage_grants' %}"{% if n == 'manage_grants' %} class="active" aria-current="page"{% endif %}>♙ <span>Права доступа</span></a>{% endif %}
+    {% endwith %}
     </nav>
     <div class="sidebar-bottom">
       <div class="demo-label">УЧЕБНАЯ ВЕРСИЯ</div>
       <p>Названия, штабы и зоны округов — из открытых источников. Состав, численность, техника и запасы — учебные (C).</p>
       {% if user.is_authenticated %}
-      <div class="userline"><span class="avatar">{{ user.username|first|upper }}</span><div><strong>{{ user.username }}</strong><small>{% if user.demo_role.role == 'manager' %}Manager{% else %}Viewer{% endif %}</small></div></div>
+      <div class="userline"><span class="avatar">{{ user.username|first|upper }}</span><div><strong>{{ user.username }}</strong><small>{% if user.demo_role.role == 'manager' %}менеджер{% else %}наблюдатель{% endif %}</small></div></div>
       <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="logout" type="submit">Выйти</button></form>
       {% endif %}
     </div>
@@ -34,7 +37,7 @@
     <header class="topbar"><span>Закрытая учебная платформа</span><span class="pill">● Синтетические данные</span></header>
     {% if messages %}<div class="flash-stack">{% for message in messages %}<p class="flash">{{ message }}</p>{% endfor %}</div>{% endif %}
     {% block content %}{% endblock %}
-    {% block footer %}<footer>Registry Demo · Локальный Django + PostgreSQL 16 · Только учебные данные</footer>{% endblock %}
+    {% block footer %}<footer>ORDA · учебная информационная система · только вымышленные данные</footer>{% endblock %}
   </main>
 </div>
 </body>

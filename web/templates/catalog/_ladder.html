@@ -1,0 +1,10 @@
+{# Лестница уровней: где мы в иерархии «округ → … → отделение». Пройденные уровни — ссылки, текущий — тёмный, ниже — пустые. #}
+<nav class="ladder" aria-label="Уровень в иерархии">
+  {% if f %}<a class="rung" href="{% url 'district_detail' d.district_code %}"><small>Округ</small><b>{{ d.short_name }}</b></a>
+  {% else %}<span class="rung current" aria-current="page"><small>Округ</small><b>{{ d.short_name }}</b></span>{% endif %}
+  {% if f %}{% if u %}<a class="rung" href="{% url 'formation_detail' d.district_code f.formation_code %}"><small>Бригада</small><b>{{ f.formation_code }}</b></a>
+  {% else %}<span class="rung current" aria-current="page"><small>Бригада</small><b>{{ f.formation_code }}</b></span>{% endif %}{% endif %}
+  {% for p in nav.path %}<a class="rung" href="{% url 'subunit_detail' d.district_code f.formation_code p.subunit_code %}" title="{{ p.subunit_name }}"><small>{{ p.level }}</small><b>{{ p.subunit_name }}</b></a>{% endfor %}
+  {% if u %}<span class="rung current" aria-current="page" title="{{ u.subunit_name }}"><small>{{ u.level }}</small><b>{{ u.subunit_name }}</b></span>{% endif %}
+  {% for lv in ladder_rest %}<span class="rung future"><small>{{ lv }}</small><b>—</b></span>{% endfor %}
+</nav>

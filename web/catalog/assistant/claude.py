@@ -26,6 +26,21 @@ TITLE_PROMPT = ('Придумай короткое название для ча�
                 'Для приветствия или постороннего вопроса — «Приветствие» или суть вопроса.')
 
 
+def clean_title(text):
+    """Название от модели без обрамляющих кавычек, точки и звёздочек. Кавычки внутри («Юг») сохраняются:
+    «Численность округа «Юг»» -> Численность округа «Юг»."""
+    text = str(text).strip().strip('*').strip().rstrip('.').strip()
+    pairs = {'«': '»', '"': '"', "'": "'", '“': '”'}
+    if text[:1] in pairs and text.endswith(pairs[text[0]]) and len(text) > 1:
+        inner = text[1:-1].strip()
+        # снимаем внешние кавычки, только если внутри после этого кавычки остаются парными
+        if inner.count('«') == inner.count('»'):
+            text = inner
+    if text.count('«') > text.count('»'):
+        text += '»'
+    return text[:60].strip() or None
+
+
 class ClaudePlanner(OllamaPlanner):
     def __init__(self, model=None):
         super().__init__()
@@ -80,8 +95,7 @@ class ClaudePlanner(OllamaPlanner):
         if response.stop_reason == 'refusal':
             return None
         text = ''.join(b.text for b in response.content if b.type == 'text').strip().split('\n')[0]
-        text = text.strip(' «»"\'.*').strip()
-        return text[:60] or None
+        return clean_title(text)
 
     def _count(self, usage):
         self.usage['input'] += usage.input_tokens or 0

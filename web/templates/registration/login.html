@@ -1,7 +1,14 @@
 {% load static %}
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Вход · Registry Demo</title><link rel="stylesheet" href="{% static 'css/style.css' %}"></head>
-<body class="login-body"><div class="login-panel">
-  <div class="brand login-brand"><span class="brand-mark">R</span><span>Registry <small>Demo</small></span></div>
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Вход · ORDA</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"><link rel="stylesheet" href="{% static 'css/style.css' %}?v=8"><link rel="stylesheet" href="{% static 'css/theme.css' %}?v=1"></head>
+<body class="login-body"><div class="login-split">
+<aside class="login-side">
+  <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 120 120"><g fill="#FFFFFF"><rect x="15" y="22" width="90" height="14" rx="4"/><rect x="30" y="53" width="60" height="14" rx="4"/><rect x="45" y="84" width="30" height="14" rx="4"/></g></svg></span><span>ORDA <small>учебная система</small></span></div>
+  <div><h2>Учебная модель сухопутных войск</h2><p>Округа, бригады и подразделения до отделения, личный состав, техника и запасы. Все данные вымышленные и предназначены только для обучения.</p>
+  <div class="levels"><span>Округ</span><span>Бригада</span><span>Батальон</span><span>Рота</span><span>Взвод</span><span>Отделение</span></div></div>
+  <div class="mono-note">Закрытая учебная платформа · синтетические данные</div>
+</aside>
+<main class="login-main"><div class="login-panel">
+  <div class="brand login-brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 120 120"><g fill="#FFFFFF"><rect x="15" y="22" width="90" height="14" rx="4"/><rect x="30" y="53" width="60" height="14" rx="4"/><rect x="45" y="84" width="30" height="14" rx="4"/></g></svg></span><span>ORDA <small>учебная система</small></span></div>
   <h1>Вход в систему</h1><p class="muted">Доступ к демонстрационным данным по выданным правам</p>
   {% if form.errors %}<p class="flash">Логин или пароль неверный.</p>{% endif %}
   <form method="post">{% csrf_token %}
@@ -10,4 +17,4 @@
     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
     <button class="btn primary full" type="submit">Войти</button>
   </form><p class="login-caption">Учётные записи создаются администратором. Публичной регистрации нет.</p>
-</div></body></html>
+</div></main></div></body></html>

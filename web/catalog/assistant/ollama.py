@@ -63,6 +63,15 @@ PLAN_PROMPT = """Ты — помощник учебной базы данных 
 - Состав одинаков во всех бригадах своего рода. Если бригада не названа: механизированное отделение —
   formation=ВОС-1, battalion=1, company=1, platoon=1, squad=1; танковый экипаж — formation=ВОС-1, company=7,
   platoon=1, squad=2; расчёт САУ — formation=АСТ-3, battalion=1, company=1, platoon=1, squad=1.
+- Люди (все вымышленные, это часть учебной базы — отвечать можно):
+  «кто командир / как зовут / ФИО командира 1-го батальона ВОС-1» -> unit_people: formation, номера, role=командир батальона;
+  «кто служит в 1-м отделении …», «список офицеров роты …» -> unit_people (category, service, role по вопросу);
+  человек по фамилии или личному номеру ЛН-… -> find_person; его возраст, группа крови, образование, контракт и другие
+  данные анкеты -> person_card; «сколько срочников / контрактников», «какие национальности», «средний возраст»,
+  «сколько с высшим образованием», «распределение по званиям» -> people_stats с group_by (service, nationality, age,
+  education, rank, category, marital, fitness, blood) и district / formation / номерами подразделения.
+  Управления бригады в модели нет: про «командира бригады» так и скажи, не выдумывай.
+- Каталог: какие категории и сколько образцов, какие образцы в категории (связь, боеприпасы…) -> catalog.
 - Характеристики образца (ТТХ: запас хода, скорость, масса, калибр, экипаж) — item_card с названием образца;
   find_item — только если спрашивают, есть ли такой образец в каталоге.
 - Если спрашивают про округ, которого нет в списке доступных ниже, не вызывай инструменты и ответь, что к этому
@@ -95,6 +104,7 @@ ANSWER_PROMPT = """Ты — помощник учебной базы данны�
   казахский ответ.
 - Первое предложение — сразу ответ. Не пиши, на каком языке вопрос или ответ, не повторяй и не переводи вопрос,
   не начинай со слов «Вопрос:» и «Ответ:».
+- Люди в базе вымышленные (учебные): ФИО, звания и данные анкеты можно называть как есть.
 - Если в таблицах нет ответа на вопрос, так и скажи."""
 
 
@@ -145,14 +155,19 @@ def language(text):
     """'kk' — казахский, 'en' — английский (латиницы больше, чем кириллицы), иначе 'ru'.
     Коды вроде ВОС-1 и названия вроде Т-72Б в английском тексте не мешают: латиницы там всё равно больше."""
     text = str(text)
-    if is_kazakh(text):
-        # казахские названия внутри русского ответа («Шығыс округінде … Из них 358 офицеров») — это русский ответ
-        words = re.findall(r'\w+', re.sub(r'«[^»]*»', ' ', text.casefold()))
-        kazakh = sum(bool(KAZAKH_LETTERS & set(w)) for w in words)
-        russian = sum(w in RUSSIAN_WORDS for w in words)
-        return 'kk' if kazakh >= russian else 'ru'
-    latin = len(re.findall(r'[A-Za-z]', text))
-    cyrillic = len(re.findall(r'[А-Яа-яЁё]', text))
+    # названия в кавычках и пояснения в скобках («Восток», (Боевая машина пехоты БМП-2)) язык не определяют
+    plain = re.sub(r'«[^»]*»|\([^)]*\)', ' ', text)
+    if is_kazakh(plain):
+        # Казахские слова с заглавной буквы — обычно имена и названия («Садыков Кайрат Есенұлы», «Шығыс»):
+        # в русском ответе они встречаются, поэтому считаем только слова со строчной буквы.
+        # Русские служебные слова («Из них 358 офицеров») — признак русского ответа.
+        words = re.findall(r'\w+', plain)
+        kazakh = sum(bool(KAZAKH_LETTERS & set(w.casefold())) and not w[:1].isupper() for w in words)
+        russian = sum(w.casefold() in RUSSIAN_WORDS for w in words)
+        if kazakh or russian:
+            return 'kk' if kazakh >= russian else 'ru'
+    latin = len(re.findall(r'[A-Za-z]', plain))
+    cyrillic = len(re.findall(r'[А-Яа-яЁё]', plain))
     return 'en' if latin > cyrillic else 'ru'
 
 
@@ -171,7 +186,7 @@ LANGUAGE_HINT = {
           'образцов оставь как в таблице. Сразу пиши ответ: не повторяй вопрос и не переводи его.',
     'en': '\n- The question will be in English: write the whole answer in English. Keep numbers as in the tables; '
           'unit codes and equipment names may stay as in the tables (ВОС-1, Т-72Б) or be transliterated (VOS-1, '
-          'T-72B). Call the districts Astana, East (Восток), West (Запад), South (Юг). Answer directly, '
+          'T-72B). Call the districts Astana, East (Восток), West (Запад), South (Юг); brigade codes: АСТ = Astana, ВОС = East, ЗАП = West, ЮГ = South (VOS-1 = ВОС-1). Never comment on codes or names. Answer directly, '
           'do not repeat the question.',
     'ru': '',
 }

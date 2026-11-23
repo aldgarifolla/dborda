@@ -20,7 +20,7 @@ PERSON = {'subunit_code': 'АСТ-1.Б1.Р1.В1.О1', 'subunit_name': '1-е ме
           'blood_group': '0(I) Rh+', 'fitness_category': 'А (годен)', 'origin': 'reused'}
 
 
-def people(code, scope, page=1, term=''):
+def people(code, scope, page=1, term='', **kw):
     rows = [PERSON] if not term or term.casefold() in PERSON['full_name'].casefold() else []
     return rows, len(rows)
 
@@ -75,3 +75,69 @@ class YearsFilterTests(SimpleTestCase):
         from catalog.templatetags.chat import years
         self.assertEqual([years(n) for n in (21, 22, 25, 31, 11, 12, 44)],
                          ['21 год', '22 года', '25 лет', '31 год', '11 лет', '12 лет', '44 года'])
+
+
+class SquadDefaultTabTests(SimpleTestCase):
+    def test_squad_opens_people(self):
+        from django.test import RequestFactory
+        from catalog.views import unit_tab
+        rf = RequestFactory()
+        self.assertEqual(unit_tab(rf.get('/'), 'отделение'), 'people')
+        self.assertEqual(unit_tab(rf.get('/?tab=summary'), 'отделение'), 'people')
+        self.assertEqual(unit_tab(rf.get('/?tab=equipment'), 'отделение'), 'equipment')
+        self.assertEqual(unit_tab(rf.get('/'), 'взвод'), 'summary')
+
+
+class NumFilterTests(SimpleTestCase):
+    def test_format(self):
+        from decimal import Decimal
+        from django.utils import translation
+        from catalog.templatetags.fmt import num
+        with translation.override('ru'):
+            self.assertEqual(num(10049), '10\xa0049')
+            self.assertEqual(num(83.4), '83,4')
+            self.assertEqual(num(Decimal('1889')), '1\xa0889')
+            self.assertEqual(num(7), '7')
+        self.assertIsNone(num(None))
+        self.assertEqual(num('120 шт.'), '120 шт.')
+
+
+@patch.multiple('catalog.repository', allowed_codes=lambda user: SCOPE,
+                get_district=lambda code, scope: next((d for d in DISTRICTS if d['district_code'] == code), None),
+                get_formation=lambda fcode, scope: FORMATION if fcode == 'АСТ-1' else None,
+                subunits=lambda fcode, scope: SUBUNITS)
+class PeopleFilterTests(TestCase):
+    def setUp(self):
+        user = get_user_model().objects.create_user('filter_viewer', password='StrongDemo123!')
+        UserRole.objects.create(user=user, role='viewer')
+        self.client.force_login(user)
+
+    def test_filters_are_passed_and_shown(self):
+        calls = []
+
+        def fake(code, scope, page=1, term='', category='', service='', district=''):
+            calls.append((code, category, service, district))
+            return [PERSON], 1
+        with patch('catalog.repository.unit_people', side_effect=fake):
+            url = reverse('formation_detail', args=['ОКР-АСТ', 'АСТ-1']) + '?tab=people&cat=офицеры&srv=по+контракту'
+            page = self.client.get(url).content.decode()
+            self.assertEqual(calls[-1], ('АСТ-1', 'офицеры', 'по контракту', ''))
+            self.assertIn('tag tag-on', page)
+            self.assertIn('Найдено: 1', page)
+            self.client.get(reverse('district_detail', args=['ОКР-АСТ']) + '?tab=people')
+            self.assertEqual(calls[-1][3], 'ОКР-АСТ')
+
+    @patch('catalog.repository.select')
+    def test_bad_filter_values_ignored(self, select):
+        select.side_effect = [[{'n': 0}], []]
+        repo.unit_people('АСТ-1', {'ОКР-АСТ'}, category="'; drop", service='x')
+        sql = select.call_args_list[0].args[0]
+        self.assertNotIn('rank_category', sql)
+        self.assertNotIn('service_type', sql)
+
+
+class SearchWordsTests(SimpleTestCase):
+    def test_stems(self):
+        self.assertEqual(repo.search_words('командир батальона'), ['команд', 'баталь'])
+        self.assertEqual(repo.search_words('ЛН-008307'), ['ЛН-008307'])
+        self.assertEqual(repo.search_words('а в'), [])

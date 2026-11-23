@@ -28,7 +28,7 @@ TEMPLATES = [{
         'django.template.context_processors.request',
         'django.contrib.auth.context_processors.auth',
         'django.contrib.messages.context_processors.messages',
-    ]},
+    ], 'builtins': ['catalog.templatetags.fmt']},
 }]
 WSGI_APPLICATION = 'config.wsgi.application'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -37,7 +37,9 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'HOST': os.environ.get('DB_HOST', 'db'),
         'PORT': os.environ.get('DB_PORT', '5432'),
-        'NAME': 'registry_auth',
+        # Версия с округами — своя база пользователей, прав, чатов и журнала (копия registry_auth),
+        # чтобы её миграции не смешивались с основной версией сайта.
+        'NAME': os.environ.get('WEB_AUTH_DB', 'registry_auth'),
         'USER': 'registry_web_auth',
         'PASSWORD': os.environ['WEB_AUTH_PASSWORD'],
         'OPTIONS': {'options': '-c statement_timeout=5000'},
@@ -66,6 +68,8 @@ OLLAMA_TIMEOUT = int(os.environ.get('OLLAMA_TIMEOUT', '120'))
 LLM_PROVIDER = os.environ.get('LLM_PROVIDER', '')
 LLM_MODEL = os.environ.get('LLM_MODEL', '')
 CLAUDE_MODEL = os.environ.get('CLAUDE_MODEL', 'claude-haiku-5-5')
+# Личный лимит вопросов помощнику в сутки (сброс в 00:00 по TIME_ZONE); 0 — без лимита.
+ASSISTANT_DAILY_LIMIT = int(os.environ.get('ASSISTANT_DAILY_LIMIT', '100'))
 if os.environ.get('DJANGO_TEST_SQLITE') == '1':
     ASSISTANT_PROVIDER = ''   # тесты не обращаются к модели
 LANGUAGE_CODE = 'ru'

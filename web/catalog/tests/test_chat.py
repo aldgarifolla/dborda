@@ -2,7 +2,7 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from catalog.assistant import ollama
@@ -228,3 +228,85 @@ class LatinItemTests(SimpleTestCase):
         repo.item_specs.return_value = []
         repo.item_holders.return_value = []
         self.assertEqual(tools.item_card({'ОКР-АСТ'}, 'BMP-2')['title'], 'Карточка образца — БМП-2')
+
+
+@override_settings(ASSISTANT_DAILY_LIMIT=2)
+@patch('catalog.views.assistant_answer', side_effect=fake_answer)
+@patch('catalog.views.repo.list_districts', return_value=DISTRICTS)
+@patch('catalog.views.repo.allowed_codes', return_value={'ОКР-АСТ'})
+class DailyLimitTests(TestCase):
+    def setUp(self):
+        from catalog.models import AssistantAudit
+        self.user = get_user_model().objects.create_user('limit_user', password='StrongDemo123!')
+        UserRole.objects.create(user=self.user, role='viewer')
+        self.client.force_login(self.user)
+        self.audit = AssistantAudit
+
+    def ask(self, n=1):
+        for _ in range(n):
+            self.audit.objects.create(user=self.user, question='q', mode='ИИ', calls=[], answer='a')
+
+    def test_counter_on_page(self, *_):
+        self.ask(1)
+        page = self.client.get(reverse('assistant')).content.decode()
+        self.assertIn('Сегодня задано 1 из 2 вопросов, осталось 1', page)
+
+    def test_limit_blocks_and_model_not_called(self, _scope, _districts, answer):
+        self.ask(2)
+        response = self.client.post(reverse('assistant'), {'question': 'ещё'}, HTTP_X_REQUESTED_WITH='fetch')
+        self.assertEqual(response.status_code, 429)
+        self.assertIn('Лимит 2 вопросов в сутки исчерпан', response.json()['error'])
+        self.assertTrue(response.json()['limit']['reached'])
+        answer.assert_not_called()
+        self.assertFalse(AssistantChat.objects.filter(user=self.user).exists())
+        page = self.client.get(reverse('assistant')).content.decode()
+        self.assertIn('исчерпан', page)
+        self.assertIn('disabled', page)
+
+    def test_yesterday_does_not_count(self, *_):
+        from datetime import timedelta
+        from django.utils import timezone
+        self.ask(2)
+        self.audit.objects.filter(user=self.user).update(created_at=timezone.now() - timedelta(days=2))
+        response = self.client.post(reverse('assistant'), {'question': 'вопрос'}, HTTP_X_REQUESTED_WITH='fetch')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['limit']['limit'], 2)
+
+
+@override_settings(ASSISTANT_DAILY_LIMIT=1)
+class EngineLimitTests(TestCase):
+    def test_engine_refuses_without_calling_planner(self):
+        from catalog.assistant import engine
+        from catalog.models import AssistantAudit
+        user = get_user_model().objects.create_user('engine_limit', password='StrongDemo123!')
+        AssistantAudit.objects.create(user=user, question='q', mode='ИИ', calls=[], answer='a')
+
+        class Boom:
+            mode = 'x'
+
+            def plan(self, *a):
+                raise AssertionError('модель не должна вызываться')
+
+        with patch('catalog.assistant.engine.repo.list_districts', return_value=DISTRICTS):
+            result = engine.answer(user, {'ОКР-АСТ'}, 'вопрос', planner=Boom())
+        self.assertEqual(result['mode'], 'лимит')
+        self.assertFalse(result['ok'])
+        self.assertEqual(AssistantAudit.objects.filter(user=user).count(), 1)
+
+
+class CleanTitleTests(SimpleTestCase):
+    def test_inner_quotes_kept(self):
+        from catalog.assistant.claude import clean_title
+        self.assertEqual(clean_title('Численность округа «Юг»'), 'Численность округа «Юг»')
+        self.assertEqual(clean_title('«Численность округа «Юг»»'), 'Численность округа «Юг»')
+        self.assertEqual(clean_title('«Танки бригады ЮГ-3».'), 'Танки бригады ЮГ-3')
+        self.assertEqual(clean_title('**Приветствие**'), 'Приветствие')
+        self.assertEqual(clean_title('Численность округа «Юг'), 'Численность округа «Юг»')
+
+
+class LanguageWithNamesTests(SimpleTestCase):
+    def test_kazakh_names_in_russian_answer(self):
+        self.assertEqual(ollama.language('Командир роты — капитан Садыков Кайрат Есенұлы, служит по контракту.'), 'ru')
+        self.assertEqual(ollama.language('ВОС-1 бригадасының 1-батальонының командирі кім?'), 'kk')
+        self.assertEqual(ollama.language('Батыста қанша адам бар?'), 'kk')
+        self.assertEqual(ollama.language('The battalion (Боевая машина пехоты БМП-2) has 30 BMP-2.'), 'en')

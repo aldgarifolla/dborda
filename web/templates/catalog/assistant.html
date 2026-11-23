@@ -11,7 +11,7 @@
   <div class="chat-scroll" id="chat-scroll">
     <div class="chat-thread" id="chat-thread">{% for m in chat_messages %}{% include 'catalog/_chat_message.html' %}{% endfor %}</div>
     {% if not chat %}<div class="chat-welcome" id="chat-welcome">
-      <div class="welcome-mark">◉</div>
+      <div class="welcome-mark" aria-hidden="true"><svg viewBox="0 0 120 120"><g fill="#FFFFFF"><rect x="15" y="22" width="90" height="14" rx="4"/><rect x="30" y="53" width="60" height="14" rx="4"/><rect x="45" y="84" width="30" height="14" rx="4"/></g></svg></div>
       <h1>Чем помочь, {{ user.username }}?</h1>
       {% if districts %}<p class="muted">Спрашивайте по-русски, по-казахски или по-английски. Доступные округа: {% for d in districts %}{{ d.short_name }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>
       <div class="chips">{% for e in examples %}<button type="button" class="chip" data-question="{{ e }}">{{ e }}</button>{% endfor %}</div>
@@ -21,10 +21,10 @@
 
   {% if districts %}<form class="composer" id="composer" method="post" action="{% if chat %}{% url 'assistant_chat' chat.pk %}{% else %}{% url 'assistant' %}{% endif %}">{% csrf_token %}
     <div class="composer-box">
-      <textarea id="question" name="question" rows="1" maxlength="500" placeholder="{% if chat %}Ответить…{% else %}Спросите про округа, бригады, технику или запасы{% endif %}" required aria-label="Вопрос"></textarea>
-      <button type="submit" class="send" aria-label="Отправить" title="Отправить (Enter)">↑</button>
+      <textarea id="question" name="question" rows="1" maxlength="500"{% if limit.reached %} disabled{% endif %} placeholder="{% if chat %}Ответить…{% else %}Спросите про округа, бригады, технику или запасы{% endif %}" required aria-label="Вопрос"></textarea>
+      <button type="submit" class="send" aria-label="Отправить" title="Отправить (Enter)"{% if limit.reached %} disabled{% endif %}>↑</button>
     </div>
-    <p class="composer-note">Enter — отправить, Shift+Enter — новая строка. Числа берутся из учебной базы, SQL помощник не пишет.</p>
+    <p class="composer-note">{% if limit.limit %}<span class="limit-note{% if limit.reached %} warn{% endif %}" id="limit-note" data-limit="{{ limit.limit }}">{% if limit.reached %}Лимит {{ limit.limit }} вопросов на сегодня исчерпан — новые вопросы после 00:00.{% else %}Сегодня задано {{ limit.used }} из {{ limit.limit }} вопросов, осталось {{ limit.left }}. Счётчик обнуляется в 00:00.{% endif %}</span><br>{% endif %}Enter — отправить, Shift+Enter — новая строка. Числа берутся из учебной базы, SQL помощник не пишет.</p>
   </form>{% endif %}
 </div>
 <script>
@@ -40,7 +40,7 @@
     }
     if (currentId() === String(id)) {
       const h = document.getElementById('chat-title'); if (h) h.textContent = title;
-      document.title = title + ' · Registry Demo';
+      document.title = title + ' · ORDA';
     }
   }
   function wireRow(row) {
@@ -83,6 +83,16 @@
 
   const form = document.getElementById('composer');
   if (!form) return;
+  // личный суточный лимит: подпись под полем ввода и блокировка, когда вопросов не осталось
+  const limitNote = document.getElementById('limit-note');
+  function showLimit(l) {
+    if (!limitNote || !l || !l.limit) return;
+    limitNote.textContent = l.reached
+      ? 'Лимит ' + l.limit + ' вопросов на сегодня исчерпан — новые вопросы после 00:00.'
+      : 'Сегодня задано ' + l.used + ' из ' + l.limit + ' вопросов, осталось ' + l.left + '. Счётчик обнуляется в 00:00.';
+    limitNote.classList.toggle('warn', !!l.reached);
+    if (l.reached) { document.getElementById('question').disabled = true; form.querySelector('.send').disabled = true; }
+  }
   const box = document.getElementById('question'), thread = document.getElementById('chat-thread');
   const scroller = document.getElementById('chat-scroll'), send = form.querySelector('.send');
   const toBottom = () => { scroller.scrollTop = scroller.scrollHeight; };
@@ -112,12 +122,17 @@
     try {
       const resp = await fetch(form.action, {method: 'POST', body: data, headers: {'X-Requested-With': 'fetch'}});
       const json = await resp.json();
+      if (json.limit) showLimit(json.limit);
+      if (resp.status === 429) {
+        pending.querySelector('.bot-body').innerHTML = '<div class="bot-error">' + esc(json.error) + '</div>';
+        box.value = question; return;
+      }
       if (!resp.ok) throw new Error(json.error || 'Ошибка ' + resp.status);
       pending.outerHTML = json.html;
       if (json.created) {
         form.action = json.send_url;
         history.replaceState(null, '', json.url);
-        document.title = json.title + ' · Registry Demo';
+        document.title = json.title + ' · ORDA';
         const list = document.getElementById('chat-list');
         document.querySelectorAll('.nav-chats .active').forEach((a) => a.classList.remove('active'));
         if (list && json.nav_html) { list.insertAdjacentHTML('afterbegin', json.nav_html); wireRow(list.firstElementChild); }
@@ -134,7 +149,8 @@
       pending.querySelector('.bot-body').innerHTML = '<div class="bot-error">Не удалось получить ответ: ' + esc(String(err.message || err)) + '. Попробуйте ещё раз.</div>';
       box.value = question; grow();
     } finally {
-      send.disabled = false; box.focus(); toBottom();
+      if (!box.disabled) { send.disabled = false; box.focus(); }
+      toBottom();
     }
   });
   box.focus();

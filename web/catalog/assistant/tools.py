@@ -126,10 +126,21 @@ def district_supply(scope, district, category='', only_deficit=False):
             table['note'] = f'Средняя обеспеченность запасами по округу: {d["supply_pct"]} %. ' + table['note']
         return table
     rows, total = repo.supply(code, scope, category=str(category)[:120], only_deficit=bool(only_deficit))
-    return _table(f'Запасы — {code}', [('item_sname', 'Позиция'), ('item_name', 'Наименование'),
-                                       ('norm_qty', 'Норма'), ('stock_qty', 'Наличие'),
-                                       ('deficit', 'Дефицит'), ('provision_pct', '%'), ('unit_measure', 'Ед.')],
-                  rows, 'registry_api.district_supply', f'Всего строк: {total}.' if total > MAX_ROWS else '')
+    table = _table(f'Запасы — {code}', [('item_sname', 'Позиция'), ('item_name', 'Наименование'),
+                                        ('norm_qty', 'Норма'), ('stock_qty', 'Наличие'),
+                                        ('deficit', 'Дефицит'), ('provision_pct', '%'), ('unit_measure', 'Ед.')],
+                   rows, 'registry_api.district_supply', f'Всего строк: {total}.' if total > MAX_ROWS else '')
+    # «чего больше всего не хватает» модель читала из таблицы неверно — худшие позиции считает код
+    lacking = [r for r in rows if r.get('provision_pct') is not None and (r.get('deficit') or 0) > 0]
+    if lacking:
+        worst = min(lacking, key=lambda r: r['provision_pct'])
+        biggest = max(lacking, key=lambda r: r['deficit'])
+        unit = lambda r: r.get('unit_measure') or ''
+        table['note'] = (f'Хуже всего обеспечена (меньше всего от нормы): {worst["item_sname"]} ({worst["item_name"]}) — '
+                         f'{worst["provision_pct"]} %, дефицит {worst["deficit"]} {unit(worst)}. '
+                         f'Самый большой дефицит в единицах: {biggest["item_sname"]} — {biggest["deficit"]} {unit(biggest)} '
+                         f'({biggest["provision_pct"]} % от нормы). ' + table['note']).strip()
+    return table
 
 
 def compare_districts(scope, metric):
@@ -273,13 +284,12 @@ def search_total(stem, rows):
     return f'Всего ({stem}): {sum(picked)} {unit} ({" + ".join(map(str, picked))}).'.replace('  ', ' ')
 
 
-def unit_composition(scope, formation='', battalion=None, company=None, platoon=None, squad=None, unit='', search='',
-                     unit_name=''):
-    """Личный состав, должности и техника бригады или любого её подразделения."""
+def resolve_unit(scope, formation='', battalion=None, company=None, platoon=None, squad=None, unit='', unit_name=''):
+    """Код подразделения по номерам, готовому коду или названию: (код, название, итоги). Чужое — ToolError."""
     formation = str(formation or '').strip().upper()
     unit = str(unit or '').strip().upper().lstrip('.')
     if unit and formation and not unit.startswith(formation):
-        unit = f'{formation}.{unit}'                    # модель прислала «У» или «Б1.МБ» отдельно от бригады
+        unit = f'{formation}.{unit}'                    # модель прислала «Б1.Р2» отдельно от бригады
     if unit_name and formation:
         unit = find_unit_by_name(scope, formation, unit_name, battalion) or unit
         if not unit:
@@ -293,13 +303,18 @@ def unit_composition(scope, formation='', battalion=None, company=None, platoon=
     if not formation:
         raise ToolError(f'Подразделение «{code or "не указано"}» недоступно или не существует.')
     if code == formation_code:
-        name, totals = formation['formation_name'], formation
-    else:
-        node = next((r for r in repo.subunits(formation_code, scope) if r['subunit_code'] == code), None)
-        if not node:
-            raise ToolError(f'Подразделение «{code}» не найдено в {formation_code}. Коды: батальоны Б1–Б3; роты сквозные — '
-                            'в Б1 роты Р1–Р3, в Б2 Р4–Р6, в Б3 Р7–Р9; взводы В1–В3; отделения О1–О3.')
-        name, totals = node['subunit_name'], node
+        return code, formation['formation_name'], formation
+    node = next((r for r in repo.subunits(formation_code, scope) if r['subunit_code'] == code), None)
+    if not node:
+        raise ToolError(f'Подразделение «{code}» не найдено в {formation_code}. Коды: батальоны Б1–Б3; роты сквозные — '
+                        'в Б1 роты Р1–Р3, в Б2 Р4–Р6, в Б3 Р7–Р9; взводы В1–В3; отделения О1–О3.')
+    return code, node['subunit_name'], node
+
+
+def unit_composition(scope, formation='', battalion=None, company=None, platoon=None, squad=None, unit='', search='',
+                     unit_name=''):
+    """Личный состав, должности и техника бригады или любого её подразделения."""
+    code, name, totals = resolve_unit(scope, formation, battalion, company, platoon, squad, unit, unit_name)
     staff = repo.unit_staff(code, scope)
     equipment = repo.unit_equipment(code, scope)
     rows = [{'k': 'Личный состав, чел.', 'v': totals.get('personnel')},
@@ -326,6 +341,113 @@ def unit_composition(scope, formation='', battalion=None, company=None, platoon=
     table['note'] = (total + ' ' if total else '') + \
         'Типовой состав по открытым источникам и оценке составителя (не штат ВС РК), учебные данные.'
     return table
+
+
+PEOPLE_LIMIT = 30
+
+
+def _people_rows(rows):
+    return [{'name': r['full_name'], 'rank': r['rank_name'], 'position': r['position_name'], 'unit': r['subunit_code'],
+             'age': r['age'], 'service': 'срочная' if r['service_type'].startswith('срочная') else 'контракт',
+             'number': r['personal_number']} for r in rows]
+
+
+PEOPLE_COLS = [('name', 'ФИО'), ('rank', 'Звание'), ('position', 'Должность'), ('unit', 'Подразделение'),
+               ('age', 'Возраст'), ('service', 'Служба'), ('number', 'Личный номер')]
+
+
+def unit_people(scope, formation='', battalion=None, company=None, platoon=None, squad=None, unit='', unit_name='',
+                district='', role='', category='', service=''):
+    """Кто служит в подразделении (с подчинёнными) или в округе: ФИО, звание, должность. role — часть должности."""
+    if district and not formation and not unit:
+        code, name = _district(scope, district), None
+        rows, total = repo.unit_people('', scope, term=role, category=category, service=service, district=code)
+        title = f'Личный состав — {code}'
+    else:
+        code, name, _ = resolve_unit(scope, formation, battalion, company, platoon, squad, unit, unit_name)
+        rows, total = repo.unit_people(code, scope, term=role, category=category, service=service)
+        title = f'Личный состав — {name} ({code})'
+    table = _table(title, PEOPLE_COLS, _people_rows(rows[:PEOPLE_LIMIT]), 'registry_api.subunit_people')
+    table['note'] = (f'Всего найдено: {total}.' + (f' Показаны первые {PEOPLE_LIMIT}.' if total > PEOPLE_LIMIT else '')
+                     + ' Люди вымышленные (C).')
+    return table
+
+
+def find_person(scope, name):
+    """Поиск человека по ФИО (любой части) или личному номеру."""
+    rows = repo.people_search(name, scope)
+    if not rows:
+        raise ToolError(f'Человек «{str(name)[:60]}» в доступных округах не найден.')
+    if len(rows) == 1:                                # нашёлся один — сразу вся анкета
+        return person_card(scope, rows[0]['personal_number'])
+    return _table(f'Поиск человека: «{str(name)[:60]}»', PEOPLE_COLS, _people_rows(rows), 'registry_api.subunit_people',
+                  'Люди вымышленные (C).')
+
+
+def person_card(scope, person):
+    """Анкета человека по личному номеру (ЛН-…) или ФИО."""
+    text = str(person or '').strip()
+    found = repo.get_person(text, scope) if text.upper().startswith('ЛН-') else None
+    if not found:
+        matches = repo.people_search(text, scope, limit=2)
+        if not matches:
+            raise ToolError(f'Человек «{text[:60]}» в доступных округах не найден.')
+        found = repo.get_person(matches[0]['personal_number'], scope)
+    keys = [('full_name', 'ФИО'), ('personal_number', 'Личный номер'), ('rank_name', 'Звание'), ('position_name', 'Должность'),
+            ('subunit_name', 'Подразделение'), ('subunit_code', 'Код подразделения'), ('formation_code', 'Бригада'),
+            ('district_code', 'Округ'), ('birth_date', 'Дата рождения'), ('age', 'Возраст'), ('nationality', 'Национальность'),
+            ('birthplace', 'Место рождения'), ('service_type', 'Вид службы'), ('service_start', 'Начало службы'),
+            ('contract_end', 'Контракт до'), ('education', 'Образование'), ('marital_status', 'Семейное положение'),
+            ('children', 'Детей'), ('height_cm', 'Рост, см'), ('weight_kg', 'Вес, кг'), ('blood_group', 'Группа крови'),
+            ('fitness_category', 'Категория годности')]
+    rows = [{'k': label, 'v': found.get(k)} for k, label in keys if found.get(k) not in (None, '')]
+    table = _table(f'Анкета — {found["full_name"]}', [('k', 'Поле'), ('v', 'Значение')], rows,
+                   'registry_api.subunit_people', 'Человек вымышленный (C).')
+    table['rows'] = [[r['k'], r['v']] for r in rows]          # анкета целиком, без обрезки до MAX_ROWS
+    return table
+
+
+GROUP_TITLES = {'category': 'категориям', 'service': 'виду службы', 'nationality': 'национальностям',
+                'education': 'образованию', 'rank': 'званиям', 'marital': 'семейному положению',
+                'fitness': 'категории годности', 'blood': 'группам крови', 'age': 'возрасту'}
+
+
+def people_stats(scope, group_by='category', district='', formation='', battalion=None, company=None, platoon=None,
+                 squad=None, unit='', unit_name=''):
+    """Распределение личного состава: по категориям, виду службы, национальностям, образованию, званиям, возрасту…"""
+    group_by = group_by if group_by in GROUP_TITLES else 'category'
+    if formation or unit:
+        code, name, _ = resolve_unit(scope, formation, battalion, company, platoon, squad, unit, unit_name)
+        rows, where = repo.people_stats(scope, group_by, code=code), f'{name} ({code})'
+    elif district:
+        code = _district(scope, district)
+        rows, where = repo.people_stats(scope, group_by, district=code), code
+    else:
+        rows, where = repo.people_stats(scope, group_by), 'все доступные округа'
+    total = sum(r['people'] for r in rows)
+    avg = round(sum((r['avg_age'] or 0) * r['people'] for r in rows) / total, 1) if total else None
+    table = _table(f'Личный состав по {GROUP_TITLES[group_by]} — {where}',
+                   [('value', 'Значение'), ('people', 'Человек'), ('avg_age', 'Средний возраст')], rows,
+                   'registry_api.subunit_people')
+    table['rows'] = [[r['value'], r['people'], r['avg_age']] for r in rows]       # без обрезки до MAX_ROWS
+    table['note'] = f'Итого: {total} чел., средний возраст {avg}.'
+    return table
+
+
+def catalog(scope, category=''):
+    """Каталог образцов: без категории — категории и число образцов, с категорией — образцы в ней."""
+    if not str(category or '').strip():
+        rows = repo.catalog_categories()
+        table = _table('Каталог образцов по категориям', [('category', 'Категория'), ('items', 'Образцов')], rows,
+                       'registry_api.items')
+        table['rows'] = [[r['category'], r['items']] for r in rows]
+        table['note'] = f'Всего образцов: {sum(r["items"] for r in rows)}.'
+        return table
+    rows = repo.catalog_items(str(category)[:80])
+    if not rows:
+        raise ToolError(f'Категории «{str(category)[:60]}» в каталоге нет.')
+    return _table(f'Каталог: {str(category)[:60]}', [('item_sname', 'Образец'), ('item_name', 'Наименование')], rows,
+                  'registry_api.items', f'Образцов: {len(rows)}.' + (f' Показаны первые {MAX_ROWS}.' if len(rows) > MAX_ROWS else ''))
 
 
 METRIC_PARAM = {'type': 'string', 'enum': list(repo.METRICS), 'description': 'personnel — численность, equipment — техника, supply — обеспеченность запасами, formations — число соединений'}
@@ -359,6 +481,33 @@ TOOLS = {
                          'only_deficit': {'type': 'boolean', 'description': 'Только позиции с дефицитом'}}, ['district']),
     'compare_districts': (compare_districts, 'Один показатель по всем доступным округам.', {'metric': METRIC_PARAM}, ['metric']),
     'find_item': (find_item, 'Поиск образца в каталоге по названию или синониму.', {'text': {'type': 'string'}}, ['text']),
+    'unit_people': (unit_people, 'Кто служит (ФИО, звание, должность, возраст) в подразделении любого уровня или в '
+                    'округе. role — часть должности (командир, механик-водитель); category — офицеры/сержанты/солдаты; '
+                    'service — срочная воинская служба / по контракту.',
+                    {'formation': {'type': 'string', 'description': 'Код бригады: АСТ-1…3, ВОС-1…3, ЗАП-1…3, ЮГ-1…3'},
+                          'battalion': {'type': 'integer'}, 'company': {'type': 'integer', 'description': 'сквозной 1–9 или 1–3 внутри батальона'},
+                          'platoon': {'type': 'integer'}, 'squad': {'type': 'integer'},
+                          'unit': {'type': 'string', 'description': 'Готовый код, например ВОС-1.Б3.Р8.В2'},
+                          'unit_name': {'type': 'string', 'description': 'Название батальона без номера: танковый батальон'},
+                          'district': DISTRICT_PARAM, 'role': {'type': 'string'},
+                          'category': {'type': 'string', 'enum': ['офицеры', 'сержанты', 'солдаты']},
+                          'service': {'type': 'string', 'enum': ['срочная воинская служба', 'по контракту']}}, []),
+    'find_person': (find_person, 'Найти человека по ФИО (фамилия, имя или их часть) или личному номеру ЛН-….',
+                    {'name': {'type': 'string'}}, ['name']),
+    'person_card': (person_card, 'Полная анкета человека: возраст, национальность, образование, вид службы, контракт, '
+                    'семья, рост, вес, группа крови. person — личный номер или ФИО.', {'person': {'type': 'string'}}, ['person']),
+    'people_stats': (people_stats, 'Сколько людей по категориям, виду службы, национальностям, образованию, званиям, '
+                     'возрасту, семейному положению, годности, группам крови и средний возраст — во всех округах, в округе '
+                     'или в подразделении.',
+                     {'formation': {'type': 'string', 'description': 'Код бригады: АСТ-1…3, ВОС-1…3, ЗАП-1…3, ЮГ-1…3'},
+                          'battalion': {'type': 'integer'}, 'company': {'type': 'integer', 'description': 'сквозной 1–9 или 1–3 внутри батальона'},
+                          'platoon': {'type': 'integer'}, 'squad': {'type': 'integer'},
+                          'unit': {'type': 'string', 'description': 'Готовый код, например ВОС-1.Б3.Р8.В2'},
+                          'unit_name': {'type': 'string', 'description': 'Название батальона без номера: танковый батальон'},
+                          'district': DISTRICT_PARAM,
+                          'group_by': {'type': 'string', 'enum': ['category', 'service', 'nationality', 'education', 'rank', 'marital', 'fitness', 'blood', 'age']}}, []),
+    'catalog': (catalog, 'Каталог образцов: без параметров — категории и число образцов; с category — список образцов категории.',
+                {'category': {'type': 'string'}}, []),
     'item_card': (item_card, 'Характеристики образца с источниками и уровнем достоверности.', {'item': {'type': 'string'}}, ['item']),
 }
 

@@ -17,5 +17,10 @@ SELECT 'CREATE DATABASE registry_auth OWNER registry_web_auth'
  WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname='registry_auth') \gexec
 REVOKE ALL ON DATABASE registry_auth FROM PUBLIC;
 GRANT CONNECT ON DATABASE registry_auth TO registry_web_auth;
+-- версия с округами: своя база (пустая при первом запуске; Django создаст таблицы миграциями)
+SELECT 'CREATE DATABASE registry_auth_districts OWNER registry_web_auth'
+ WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname='registry_auth_districts') \gexec
+REVOKE ALL ON DATABASE registry_auth_districts FROM PUBLIC;
+GRANT CONNECT ON DATABASE registry_auth_districts TO registry_web_auth;
 SQL
 echo 'Отдельная БД registry_auth подготовлена. military_lab не изменена.'

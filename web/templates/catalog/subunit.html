@@ -2,10 +2,11 @@
 {% block title %}{{ u.subunit_name }} · {{ f.formation_code }}{% endblock %}
 {% block content %}
 <div class="breadcrumb"><a href="{% url 'district_list' %}">Округа</a><span>/</span><a href="{% url 'district_detail' d.district_code %}">{{ d.short_name }}</a><span>/</span><a href="{% url 'formation_detail' d.district_code f.formation_code %}">{{ f.formation_code }}</a>{% for p in nav.path %}<span>/</span><a href="{% url 'subunit_detail' d.district_code f.formation_code p.subunit_code %}">{{ p.subunit_name }}</a>{% endfor %}<span>/</span><span>{{ u.subunit_name }}</span></div>
+{% include 'catalog/_ladder.html' %}
 <div class="page-heading"><div><p class="eyebrow">{{ u.level|upper }} · {{ u.subunit_code }}</p><h1>{{ u.subunit_name }}</h1><p class="sub">{% for p in nav.path reversed %}{{ p.subunit_name }} · {% endfor %}{{ f.formation_name }} · {{ d.short_name }}</p></div><span class="pill">Учебные данные ({{ u.confidence }})</span></div>
 <div class="stats">
-  <div class="stat"><span>Личный состав</span><strong>{{ u.personnel }}</strong><small>офицеров {{ u.officers }} · сержантов {{ u.sergeants }} · солдат {{ u.soldiers }}</small></div>
-  <div class="stat"><span>Техника</span><strong>{{ u.equipment_units }}</strong><small>ед., без стрелкового оружия</small></div>
+  <div class="stat"><span>Личный состав</span><strong>{{ u.personnel|num }}</strong><small>офицеров {{ u.officers }} · сержантов {{ u.sergeants }} · солдат {{ u.soldiers }}</small></div>
+  <div class="stat"><span>Техника</span><strong>{{ u.equipment_units|num }}</strong><small>ед., без стрелкового оружия</small></div>
   {% for label, n in nav.stats %}<div class="stat"><span>{{ label }}</span><strong>{{ n }}</strong><small>в составе (C)</small></div>{% endfor %}
 </div>
 {% include 'catalog/_unit_tabs.html' %}

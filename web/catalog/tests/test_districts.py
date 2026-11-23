@@ -95,6 +95,7 @@ class DistrictCodeTests(TestCase):
                 get_formation=lambda fcode, scope: FORMATION if fcode == 'АСТ-1' else None,
                 subunits=lambda fcode, scope: SUBUNITS,
                 unit_staff=lambda code, scope, own_only=False: STAFF,
+                unit_people=lambda code, scope, page=1, term='', **kw: ([], 0),
                 unit_equipment=lambda code, scope: [{'item_sname': 'БМП-2', 'item_name': 'Боевая машина пехоты',
                                                      'category': 'Бронетанковое', 'qty': 1, 'unit_measure': 'шт.',
                                                      'sources': 'W_MSO', 'confidence': 'B'}],
@@ -167,7 +168,8 @@ class DistrictPagesTests(TestCase):
         self.assertNotIn('1-й взвод', page)
         self.get_ok(url('АСТ-1.Б1.Р1'), '1-й взвод', url('АСТ-1.Б1.Р1.В1'), '1-й механизированный батальон')
         self.get_ok(url('АСТ-1.Б1.Р1.В1'), '1-е отделение', '2-е отделение', url('АСТ-1.Б1.Р1.В1.О2'))
-        self.get_ok(url('АСТ-1.Б1.Р1.В1.О2'), '2-е отделение', 'нижний уровень', '1-я механизированная рота')
+        page = self.get_ok(url('АСТ-1.Б1.Р1.В1.О2'), '2-е отделение', '1-я механизированная рота', 'Личный состав')
+        self.assertNotIn('?tab=summary', page)                      # у отделения сразу личный состав, без сводки
 
     def test_unit_tabs(self):
         base = reverse('subunit_detail', kwargs={'code': 'ОКР-АСТ', 'fcode': 'АСТ-1', 'scode': 'АСТ-1.Б1.Р1.В1.О2'})

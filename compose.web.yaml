@@ -7,8 +7,11 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: "5432"
+      WEB_AUTH_DB: ${WEB_AUTH_DB:-registry_auth_districts}
       APP_READER_PASSWORD: ${APP_READER_PASSWORD:?Run python3 scripts/make_env.py}
-      DJANGO_DEBUG: "1"
+      # Режим отладки выключен: страницы ошибок не показывают внутреннее устройство сайта.
+      # Для разработки — DJANGO_DEBUG=1 в .env (не на показе и не на сервере).
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-0}
       # Помощник на локальной модели (Ollama на этом Mac). Если модель недоступна — режим ключевых слов.
       ASSISTANT_PROVIDER: ${ASSISTANT_PROVIDER-catalog.assistant.ollama.OllamaPlanner}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
@@ -22,6 +25,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["sh", "-c", "python manage.py migrate --noinput && exec python manage.py runserver 0.0.0.0:8000"]
+    # --insecure: при выключенной отладке runserver сам отдаёт CSS (сайт слушает только 127.0.0.1)
+    command: ["sh", "-c", "python manage.py migrate --noinput && exec python manage.py runserver --insecure 0.0.0.0:8000"]
     security_opt:
       - no-new-privileges:true

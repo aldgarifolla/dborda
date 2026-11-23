@@ -1,5 +1,8 @@
 """Один вопрос -> план вызовов -> проверенные вызовы инструментов -> ответ и запись в журнал."""
+from datetime import timedelta
+
 from django.conf import settings
+from django.utils import timezone
 from django.utils.module_loading import import_string
 
 from .. import repository as repo
@@ -22,6 +25,19 @@ def get_planner():
     return KeywordPlanner()
 
 
+def limit_status(user):
+    """Личный суточный лимит: сколько вопросов задано сегодня (по журналу) и сколько осталось.
+    Сутки — по часовому поясу сайта, сброс в 00:00."""
+    limit = int(getattr(settings, 'ASSISTANT_DAILY_LIMIT', 0) or 0)
+    start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+    used = AssistantAudit.objects.filter(user=user, created_at__gte=start).count() if user.is_authenticated else 0
+    return {'limit': limit, 'used': used, 'left': max(0, limit - used) if limit else None,
+            'reached': bool(limit) and used >= limit, 'resets_at': start + timedelta(days=1)}
+
+
+LIMIT_TEXT = 'Лимит {limit} вопросов в сутки исчерпан. Новые вопросы можно будет задать после 00:00.'
+
+
 def answer(user, scope, question, planner=None, audit=True, history=None):
     """planner — готовый планировщик (для сравнения моделей); audit=False — не писать в журнал;
     history — прошлые обмены чата [(вопрос, ответ), …], чтобы понимать уточнения («а на Востоке?»)."""
@@ -33,6 +49,11 @@ def answer(user, scope, question, planner=None, audit=True, history=None):
     if not scope:
         result.update(text='Вам не выдан доступ ни к одному учебному округу.', ok=False)
         return result
+    if audit:                                 # сравнение моделей (audit=False) в лимит не входит
+        status = limit_status(user)
+        if status['reached']:
+            result.update(text=LIMIT_TEXT.format(limit=status['limit']), mode='лимит', ok=False)
+            return result
     districts = repo.list_districts(scope)
     planner = planner or get_planner()
     planner.history = list(history or [])

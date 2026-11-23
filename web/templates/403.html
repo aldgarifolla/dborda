@@ -1,0 +1,3 @@
+{% extends 'base.html' %}{% block title %}Нет доступа{% endblock %}
+{% block content %}<div class="page-heading"><div><p class="eyebrow">ОШИБКА 403</p><h1>Нет доступа</h1><p class="sub">У вашей учётной записи нет прав на это действие.</p></div></div>
+<div class="panel"><a class="btn" href="{% url 'dashboard' %}">На главную</a></div>{% endblock %}

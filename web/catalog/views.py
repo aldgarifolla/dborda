@@ -10,11 +10,11 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 from . import repository as repo
 from .assistant import answer as assistant_answer
-from .assistant.engine import suggest_title
+from .assistant.engine import LIMIT_TEXT, limit_status, suggest_title
 from .models import AssistantChat, UnitGrant, UserRole, GrantAudit
 from .services import assign_grant, GrantDenied
 
-TABS = ('summary', 'equipment', 'supply')
+TABS = ('summary', 'people', 'equipment', 'supply')
 CHAT_LIST_LEN = 40        # чатов в боковом меню
 CHAT_CONTEXT = 3          # сколько прошлых обменов чата видит помощник (для уточнений «а на Востоке?»)
 CHAT_EXAMPLES = ('Сравни округа по численности', 'Чего больше всего не хватает на Востоке?',
@@ -84,7 +84,7 @@ def district_detail(request, code):
     if tab not in TABS:
         tab = 'summary'
     category = request.GET.get('category', '')[:120]
-    ctx = {'d': district, 'tab': tab, 'category': category}
+    ctx = {'d': district, 'tab': tab, 'category': category, 'ladder_rest': ladder_rest(None)}
     if tab == 'summary':
         ctx.update(formations=repo.formations(code, scope), strength=repo.strength(code, scope),
                    regions=repo.regions(code, scope))
@@ -93,6 +93,8 @@ def district_detail(request, code):
         rows, total = repo.equipment(code, scope, category=category, term=q, page=request.GET.get('page'))
         ctx.update(rows=rows, q=q, categories=repo.equipment_categories(code, scope), pager=pager(request.GET.get('page'), total),
                    query=urlencode({'tab': tab, 'category': category, 'q': q}) + '&')
+    elif tab == 'people':
+        ctx.update(people_context(request, scope, district=district['district_code']))
     else:
         deficit = request.GET.get('deficit') == '1'
         rows, total = repo.supply(code, scope, category=category, only_deficit=deficit, page=request.GET.get('page'))
@@ -113,6 +115,7 @@ def formation_detail(request, code, fcode):
     tab = unit_tab(request)
     return render(request, 'catalog/formation.html', {
         'd': district, 'f': formation, 'nav': repo.subunit_nav(repo.subunits(fcode, scope)), 'tab': tab,
+        'ladder_rest': ladder_rest('бригада'),
         **unit_tab_data(tab, fcode, scope, own=False, request=request),
     })
 
@@ -129,29 +132,58 @@ def subunit_detail(request, code, fcode, scode):
     nav = repo.subunit_nav(repo.subunits(fcode, scope), scode)
     if not nav:
         raise Http404('Подразделение не найдено')
-    tab = unit_tab(request)
+    tab = unit_tab(request, nav['node']['level'])
     return render(request, 'catalog/subunit.html', {
         'd': district, 'f': formation, 'nav': nav, 'u': nav['node'], 'tab': tab,
+        'ladder_rest': ladder_rest(nav['node']['level']),
         **unit_tab_data(tab, scode, scope, own=True, request=request),
     })
+
+
+LADDER = ('бригада', 'батальон', 'рота', 'взвод', 'отделение')
+
+
+def ladder_rest(level):
+    """Уровни ниже текущего — пустые ступени «лестницы» на странице (округ -> бригада -> … -> отделение)."""
+    return list(LADDER[LADDER.index(level) + 1:]) if level in LADDER else list(LADDER)
 
 
 UNIT_TABS = ('summary', 'staff', 'people', 'equipment')
 
 
-def unit_tab(request):
-    tab = request.GET.get('tab', 'summary')
-    return tab if tab in UNIT_TABS else 'summary'
+PEOPLE_FILTERS = {'cat': (('', 'Все'), ('офицеры', 'Офицеры'), ('сержанты', 'Сержанты'), ('солдаты', 'Солдаты')),
+                  'srv': (('', 'Любая служба'), ('срочная воинская служба', 'Срочная'), ('по контракту', 'Контракт'))}
+
+
+def people_context(request, scope, code='', district=''):
+    """Вкладка «Личный состав»: поиск, фильтры по категории и виду службы, страницы."""
+    get = request.GET if request else {}
+    q, cat, srv = (get.get('q', '') or '')[:60], get.get('cat', ''), get.get('srv', '')
+    page = get.get('page') or 1
+    rows, total = repo.unit_people(code, scope, page, q, category=cat, service=srv, district=district)
+    current = {'tab': 'people', 'q': q, 'cat': cat, 'srv': srv}
+    filters = []
+    for key, options in PEOPLE_FILTERS.items():
+        filters.append([{'label': label, 'active': current[key] == value,
+                         'url': '?' + urlencode({k: v for k, v in {**current, key: value}.items() if v})}
+                        for value, label in options])
+    return {'people': rows, 'q': q, 'cat': cat, 'srv': srv, 'people_filters': filters, 'pager': pager(page, total),
+            'people_total': total, 'query': urlencode({k: v for k, v in current.items() if v}) + '&'}
+
+
+def unit_tab(request, level=None):
+    """Вкладка из адреса. У отделения сводки нет (это нижний уровень) — сразу «Личный состав»."""
+    default = 'people' if level == 'отделение' else 'summary'
+    tab = request.GET.get('tab', default)
+    if tab not in UNIT_TABS or (level == 'отделение' and tab == 'summary'):
+        return default
+    return tab
 
 
 def unit_tab_data(tab, code, scope, own, request=None):
     """Данные вкладок бригады и подразделения: должности (своё управление и все подчинённые), люди и техника."""
     if tab == 'people':
-        q = (request.GET.get('q', '') if request else '')[:60]
-        page = request.GET.get('page') if request else 1
-        rows, total = repo.unit_people(code, scope, page, q)
-        return {'people': rows, 'q': q, 'pager': pager(page, total),
-                'query': urlencode({'tab': 'people', 'q': q}) + '&'}
+        return people_context(request, scope, code=code)
     if tab == 'staff':
         return {'own_staff': repo.unit_staff(code, scope, own_only=True) if own else [],
                 'staff': repo.unit_staff(code, scope)}
@@ -205,6 +237,10 @@ def chat_title(question):
     return (cut or text[:TITLE_LEN - 1]) + '…'
 
 
+def limit_json(status):
+    return {'limit': status['limit'], 'used': status['used'], 'left': status['left'], 'reached': status['reached']}
+
+
 def wants_json(request):
     return request.headers.get('X-Requested-With') == 'fetch'
 
@@ -220,6 +256,7 @@ def assistant(request, chat_id=None):
         'chat': chat, 'chat_messages': chat.messages.all() if chat else [],
         'chats': request.user.assistant_chats.all()[:CHAT_LIST_LEN],
         'districts': repo.list_districts(scope_for(request)), 'examples': CHAT_EXAMPLES,
+        'limit': limit_status(request.user),
     })
 
 
@@ -228,6 +265,13 @@ def assistant_send(request, chat):
     if not question:
         if wants_json(request):
             return JsonResponse({'error': 'Введите вопрос.'}, status=400)
+        return redirect('assistant_chat', chat.pk) if chat else redirect('assistant')
+    status = limit_status(request.user)
+    if status['reached']:                     # модель не вызывается, чат не создаётся
+        text = LIMIT_TEXT.format(limit=status['limit'])
+        if wants_json(request):
+            return JsonResponse({'error': text, 'limit': limit_json(status)}, status=429)
+        messages.warning(request, text)
         return redirect('assistant_chat', chat.pk) if chat else redirect('assistant')
     history = []
     if chat:
@@ -244,6 +288,7 @@ def assistant_send(request, chat):
     if wants_json(request):
         return JsonResponse({'chat_id': chat.pk, 'url': url, 'title': chat.title, 'created': created,
                              'send_url': url, 'title_url': reverse('assistant_title', args=[chat.pk]),
+                             'limit': limit_json(limit_status(request.user)),
                              'nav_html': render_to_string('catalog/_chat_nav_item.html',
                                                           {'c': chat, 'current': chat}, request) if created else '',
                              'html': render_to_string('catalog/_chat_message.html', {'m': message}, request)})

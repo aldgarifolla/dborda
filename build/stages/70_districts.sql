@@ -1,5 +1,5 @@
 -- Округа: сводная модель по региональным командованиям ВС РК вместо подробной структуры.
--- Идемпотентно (схема district пересоздаётся). Требует этап 60_kz_regional_commands.sql.
+-- Идемпотентно (схема district пересоздаётся вместе с личным составом). Требует этап 60_kz_regional_commands.sql.
 --
 -- Что откуда берётся:
 --   округа (4 учебных округа на месте региональных командований), города штабов, зоны ответственности —
@@ -58,11 +58,9 @@ CREATE TABLE district.formation (
   district_code  text NOT NULL REFERENCES district.district,
   formation_name text NOT NULL,
   formation_type text NOT NULL,
-  scale          numeric NOT NULL CHECK (scale > 0),
   origin         text NOT NULL CHECK (origin IN ('derived', 'generated')),
   load_run_id    bigint NOT NULL REFERENCES etl.load_run);
 COMMENT ON TABLE district.formation IS 'Условные соединения в составе округа (C). Реальный состав открыто не опубликован';
-COMMENT ON COLUMN district.formation.scale IS 'Масштаб соединения относительно базовой бригады (1.00 = базовая)';
 
 -- Подразделения соединений: батальон (дивизион) -> рота (батарея) -> взвод -> отделение. Все условные (C).
 CREATE TABLE district.subunit (
@@ -175,10 +173,9 @@ SELECT replace(c.rc_code, 'РгК-', 'ОКР-'), c.rc_code,
        regexp_replace(c.short_name, '^РгК', 'Округ'),
        regexp_replace(c.full_name, '^региональное командование', 'учебный округ'),
        c.hq_city, 'свои',
-       (SELECT string_agg(r.region_name || CASE WHEN r.confidence <> 'A' THEN '*' ELSE '' END, ', '
-                          ORDER BY r.region_kind DESC, r.region_name)
-          FROM refdata.kz_rc_region r WHERE r.rc_code = c.rc_code)
-       || ' (по Указу № 354 от 2012 г., утратил силу в 2018 г.; * — вывод для областей, образованных позже)',
+       -- зона ответственности — просто список областей и городов (источники остаются в refdata.kz_rc_region)
+       (SELECT string_agg(r.region_name, ', ' ORDER BY r.region_kind DESC, r.region_name)
+          FROM refdata.kz_rc_region r WHERE r.rc_code = c.rc_code),
        c.sort_order, f.stock, 'derived',
        greatest(c.hq_confidence, (SELECT max(r.confidence) FROM refdata.kz_rc_region r WHERE r.rc_code = c.rc_code)),
        currval('etl.load_run_run_id_seq')
@@ -187,22 +184,23 @@ JOIN (VALUES ('РгК-АСТ', 0.97), ('РгК-ВОС', 0.88), ('РгК-ЗАП',
 
 -- ---------------------------------------------------------------- условные соединения
 -- ВОС-1 — базовая бригада: в подробной модели 12 мбр входит в РгК «Восток» (узел 20.0.6.), здесь — Округ «Восток».
-INSERT INTO district.formation (formation_code, district_code, formation_name, formation_type, scale, origin, load_run_id)
-SELECT v.code, v.d, v.name, v.typ, v.scale, v.origin, currval('etl.load_run_run_id_seq')
+-- Простые учебные названия со сквозной нумерацией по стране: Астана 1–3, Восток 4–6, Запад 7–9, Юг 10–12.
+INSERT INTO district.formation (formation_code, district_code, formation_name, formation_type, origin, load_run_id)
+SELECT v.code, v.d, v.name, v.typ, v.origin, currval('etl.load_run_run_id_seq')
 FROM (VALUES
-  ('АСТ-1', 'ОКР-АСТ', 'Условное соединение АСТ-1', 'механизированная бригада (условная)', 1.00, 'generated'),
-  ('АСТ-2', 'ОКР-АСТ', 'Условное соединение АСТ-2', 'механизированная бригада (условная)', 0.95, 'generated'),
-  ('АСТ-3', 'ОКР-АСТ', 'Условное соединение АСТ-3', 'артиллерийская бригада (условная)', 0.35, 'generated'),
-  ('ВОС-1', 'ОКР-ВОС', 'Условное соединение ВОС-1 (профиль 12 мбр)', 'механизированная бригада (условная)', 1.00, 'derived'),
-  ('ВОС-2', 'ОКР-ВОС', 'Условное соединение ВОС-2', 'механизированная бригада (условная)', 0.90, 'generated'),
-  ('ВОС-3', 'ОКР-ВОС', 'Условное соединение ВОС-3', 'бригада обеспечения (условная)', 0.50, 'generated'),
-  ('ЗАП-1', 'ОКР-ЗАП', 'Условное соединение ЗАП-1', 'механизированная бригада (условная)', 1.00, 'generated'),
-  ('ЗАП-2', 'ОКР-ЗАП', 'Условное соединение ЗАП-2', 'механизированная бригада (условная)', 0.90, 'generated'),
-  ('ЗАП-3', 'ОКР-ЗАП', 'Условное соединение ЗАП-3', 'бригада обеспечения (условная)', 0.80, 'generated'),
-  ('ЮГ-1',  'ОКР-ЮГ',  'Условное соединение ЮГ-1',  'механизированная бригада (условная)', 1.10, 'generated'),
-  ('ЮГ-2',  'ОКР-ЮГ',  'Условное соединение ЮГ-2',  'механизированная бригада (условная)', 1.00, 'generated'),
-  ('ЮГ-3',  'ОКР-ЮГ',  'Условное соединение ЮГ-3',  'танковая бригада (условная)', 0.60, 'generated')
-) v(code, d, name, typ, scale, origin);
+  ('АСТ-1', 'ОКР-АСТ', '1-я механизированная бригада',  'механизированная бригада', 'generated'),
+  ('АСТ-2', 'ОКР-АСТ', '2-я механизированная бригада',  'механизированная бригада', 'generated'),
+  ('АСТ-3', 'ОКР-АСТ', '3-я артиллерийская бригада',    'артиллерийская бригада',   'generated'),
+  ('ВОС-1', 'ОКР-ВОС', '4-я механизированная бригада',  'механизированная бригада', 'derived'),
+  ('ВОС-2', 'ОКР-ВОС', '5-я механизированная бригада',  'механизированная бригада', 'generated'),
+  ('ВОС-3', 'ОКР-ВОС', '6-я бригада обеспечения',       'бригада обеспечения',      'generated'),
+  ('ЗАП-1', 'ОКР-ЗАП', '7-я механизированная бригада',  'механизированная бригада', 'generated'),
+  ('ЗАП-2', 'ОКР-ЗАП', '8-я механизированная бригада',  'механизированная бригада', 'generated'),
+  ('ЗАП-3', 'ОКР-ЗАП', '9-я бригада обеспечения',       'бригада обеспечения',      'generated'),
+  ('ЮГ-1',  'ОКР-ЮГ',  '10-я механизированная бригада', 'механизированная бригада', 'generated'),
+  ('ЮГ-2',  'ОКР-ЮГ',  '11-я механизированная бригада', 'механизированная бригада', 'generated'),
+  ('ЮГ-3',  'ОКР-ЮГ',  '12-я танковая бригада',         'танковая бригада',         'generated')
+) v(code, d, name, typ, origin);
 
 -- ---------------------------------------------------------------- типовые нормы (открытые источники)
 -- Штаты ВС РК не опубликованы. Состав взят из открытых описаний типовых подразделений СА/ВС РФ
@@ -521,8 +519,7 @@ WHERE w.kind <> 'вышестоящий' AND u.side = 'свои'
 GROUP BY 1;
 
 -- ---------------------------------------------------------------- итоги округов снизу вверх
--- Численность и техника округа = сумма его подразделений. Запасы: профиль норм 12 мбр, пересчитанный
--- на численность округа (норма на человека та же), наличие — с учётом условной доли stock_factor.
+-- Численность и техника округа = сумма его подразделений. Запасы — ниже, по тому, кто их расходует.
 INSERT INTO district.strength
 SELECT f.district_code, r.category, sum(st.qty)::int, 'derived', 'C', currval('etl.load_run_run_id_seq')
 FROM district.subunit_staff st JOIN district.subunit s USING (subunit_code)
@@ -534,17 +531,79 @@ SELECT f.district_code, e.item_sname, sum(e.qty), 'derived', 'C', currval('etl.l
 FROM district.subunit_equipment e JOIN district.subunit s USING (subunit_code) JOIN district.formation f USING (formation_code)
 GROUP BY f.district_code, e.item_sname;
 
-CREATE TEMP TABLE zz_scale ON COMMIT DROP AS
-SELECT d.district_code, d.stock_factor,
-       (SELECT sum(personnel) FROM district.strength x WHERE x.district_code = d.district_code)::numeric
-         / (SELECT n FROM zz_base_strength) AS scale
-FROM district.district d;
+-- Запасы округа привязаны к тому, кто их расходует (учебная оценка, C):
+--   боеприпасы  — боекомплект на единицу оружия × сколько этого оружия в округе (нет оружия — нет и боеприпасов);
+--   горючее     — заправка на машину × число машин; масла и охлаждающая жидкость — тоже по машинам;
+--   шлемофоны и комбинезоны — по экипажам;
+--   одежда, снаряжение, медицина, питание — по численности (норма на человека из профиля 12 мбр).
+-- Наличие = норма × доля наличия этой позиции в профиле 12 мбр × условная доля округа stock_factor.
+CREATE TEMP TABLE zz_rule ON COMMIT DROP AS
+SELECT * FROM (VALUES
+  ('5.45-мм ПС (7Н6)',            '5,45-мм АК-74М', 300), ('5.45-мм ПС (7Н6)', '5,45-мм АКС-74У', 300),
+  ('7.62-мм ЛПС (57-Н-323С)',     '7,62-мм ПКМ', 1000), ('7.62-мм ЛПС (57-Н-323С)', 'БМП-2', 2000),
+  ('7.62-мм ЛПС (57-Н-323С)',     'Т-72Б', 2000), ('7.62-мм ЛПС (57-Н-323С)', 'Т-72К', 2000),
+  ('9-мм П (57-Н-181)',           '9-мм ПМ', 16),
+  ('12,7-мм Б-32 (57-Б3-542)',    'Т-72Б', 300), ('12,7-мм Б-32 (57-Б3-542)', 'Т-72К', 300),
+  ('30-мм выстрелы к 2А42 (БК)',  'БМП-2', 500),
+  ('ПТУР 9М111',                  'БМП-2', 4),
+  ('125-мм выстрелы к 2А46 (БК)', 'Т-72Б', 45), ('125-мм выстрелы к 2А46 (БК)', 'Т-72К', 45),
+  ('122-мм выстрелы к 2А31 (БК)', '122-мм 2С1 Гвоздика', 40),
+  ('122-мм М-21ОФ',               'БМ-21 РСЗО Град', 80),
+  ('ПГ-7ВС',                      'РПГ-7Д', 5),
+  -- запас оружия — 5 % от состоящего на вооружении
+  ('5,45-мм АК-74М', '5,45-мм АК-74М', 0.05), ('5,45-мм АКС-74У', '5,45-мм АКС-74У', 0.05),
+  ('9-мм ПМ', '9-мм ПМ', 0.05), ('РПГ-7Д', 'РПГ-7Д', 0.05),
+  -- горючее: заправка машины, л
+  ('ДТ', 'Т-72Б', 1200), ('ДТ', 'Т-72К', 1200), ('ДТ', 'БМП-2', 460), ('ДТ', 'БМП-1КШ', 460),
+  ('ДТ', '122-мм 2С1 Гвоздика', 550), ('ДТ', 'БМ-21 РСЗО Град', 360), ('ДТ', 'УРАЛ-4320', 300),
+  ('ДТ', 'АТМЗ-5-4320', 300), ('ДТ', 'МТО-АТ', 210), ('ДТ', 'МТ-ЛБУ', 450),
+  ('АИ-92', 'УАЗ-3151', 78),
+  ('М-10ДМ', 'Т-72Б', 40), ('М-10ДМ', 'Т-72К', 40), ('М-10ДМ', 'БМП-2', 25), ('М-10ДМ', 'БМП-1КШ', 25),
+  ('М-10ДМ', '122-мм 2С1 Гвоздика', 25), ('М-10ДМ', 'БМ-21 РСЗО Град', 20), ('М-10ДМ', 'УРАЛ-4320', 20),
+  ('М-10ДМ', 'АТМЗ-5-4320', 20), ('М-10ДМ', 'МТО-АТ', 20), ('М-10ДМ', 'МТ-ЛБУ', 25), ('М-10ДМ', 'УАЗ-3151', 6),
+  ('ТАп-15В', 'Т-72Б', 20), ('ТАп-15В', 'Т-72К', 20), ('ТАп-15В', 'БМП-2', 15), ('ТАп-15В', 'БМП-1КШ', 15),
+  ('ТАп-15В', '122-мм 2С1 Гвоздика', 15), ('ТАп-15В', 'УРАЛ-4320', 12), ('ТАп-15В', 'АТМЗ-5-4320', 12),
+  ('ТАп-15В', 'БМ-21 РСЗО Град', 12), ('ТАп-15В', 'МТО-АТ', 12), ('ТАп-15В', 'МТ-ЛБУ', 15), ('ТАп-15В', 'УАЗ-3151', 4),
+  ('ОЖ-40', 'Т-72Б', 90), ('ОЖ-40', 'Т-72К', 90), ('ОЖ-40', 'БМП-2', 40), ('ОЖ-40', 'БМП-1КШ', 40),
+  ('ОЖ-40', '122-мм 2С1 Гвоздика', 40), ('ОЖ-40', 'УРАЛ-4320', 30), ('ОЖ-40', 'АТМЗ-5-4320', 30),
+  ('ОЖ-40', 'БМ-21 РСЗО Град', 30), ('ОЖ-40', 'МТО-АТ', 30), ('ОЖ-40', 'МТ-ЛБУ', 35), ('ОЖ-40', 'УАЗ-3151', 12),
+  -- экипажи
+  ('Шлемофон ТШ-5', 'Т-72Б', 3), ('Шлемофон ТШ-5', 'Т-72К', 3), ('Шлемофон ТШ-5', 'БМП-2', 3),
+  ('Шлемофон ТШ-5', 'БМП-1КШ', 3), ('Шлемофон ТШ-5', '122-мм 2С1 Гвоздика', 4), ('Шлемофон ТШ-5', 'МТ-ЛБУ', 2),
+  ('Комбинезон танковый', 'Т-72Б', 3), ('Комбинезон танковый', 'Т-72К', 3),
+  ('Комбинезон технический', 'УРАЛ-4320', 1), ('Комбинезон технический', 'АТМЗ-5-4320', 1),
+  ('Комбинезон технический', 'МТО-АТ', 2), ('Комбинезон технический', 'БМ-21 РСЗО Град', 1),
+  ('Комбинезон технический', 'УАЗ-3151', 1), ('Комбинезон технический', 'МТ-ЛБУ', 1)
+) r(item_sname, driver, per_unit);
+
+-- позиции, которые считаются по численности: всё из профиля, кроме привязанных к технике и кроме
+-- боеприпасов и оружия без своего оружия в модели (патроны к «Шилке», ракеты «Стрелы-10» и т. п.)
+CREATE TEMP TABLE zz_per_person ON COMMIT DROP AS
+SELECT b.item_sname, b.norm_qty / (SELECT n FROM zz_base_strength) AS per_person
+FROM zz_base_supply b JOIN mil_core.item i USING (item_sname)
+WHERE b.norm_qty > 0
+  AND b.item_sname NOT IN (SELECT item_sname FROM zz_rule)
+  AND i.category NOT IN ('Боеприпасы', 'Стрелковое оружие и гранатомёты')
+UNION ALL
+SELECT i.item_sname, 2.0 / 1 FROM mil_core.item i WHERE i.item_sname IN ('РГД-5', 'Ф-1');   -- по 2 гранаты на человека
+
+CREATE TEMP TABLE zz_supply_norm ON COMMIT DROP AS
+SELECT e.district_code, r.item_sname, sum(e.qty * r.per_unit) AS norm_qty
+FROM zz_rule r JOIN district.equipment e ON e.item_sname = r.driver
+GROUP BY 1, 2
+UNION ALL
+SELECT d.district_code, p.item_sname, p.per_person * (SELECT sum(personnel) FROM district.strength x WHERE x.district_code = d.district_code)
+FROM district.district d CROSS JOIN zz_per_person p;
 
 INSERT INTO district.supply
-SELECT s.district_code, b.item_sname, greatest(1, round(b.norm_qty * s.scale)), round(b.stock_qty * s.scale * s.stock_factor),
+SELECT n.district_code, n.item_sname, greatest(1, ceil(n.norm_qty)),
+       round(greatest(1, ceil(n.norm_qty))
+             * least(1, coalesce(b.stock_qty / nullif(b.norm_qty, 0), 0.8)) * d.stock_factor),
        'generated', 'C', currval('etl.load_run_run_id_seq')
-FROM zz_scale s CROSS JOIN zz_base_supply b
-WHERE b.norm_qty > 0;
+FROM zz_supply_norm n
+JOIN district.district d USING (district_code)
+LEFT JOIN zz_base_supply b USING (item_sname)
+WHERE n.norm_qty > 0;
 
 DO $$ BEGIN
   IF (SELECT count(*) FROM district.district) <> 4 THEN RAISE EXCEPTION 'ожидалось 4 округа'; END IF;
@@ -600,7 +659,7 @@ FROM refdata.kz_rc_region r JOIN refdata.kz_rc_source s USING (source_code)
 JOIN district.district d ON d.rc_code = r.rc_code;
 
 CREATE OR REPLACE VIEW registry_api.district_formations AS
-SELECT f.formation_code, f.district_code, f.formation_name, f.formation_type, f.scale, f.origin,
+SELECT f.formation_code, f.district_code, f.formation_name, f.formation_type, f.origin,
        'учебные данные'::text AS data_status,
        count(*) FILTER (WHERE s.level = 'батальон') AS battalions,
        count(*) FILTER (WHERE s.level = 'рота') AS companies,
@@ -662,6 +721,227 @@ SELECT alias, item_sname FROM mil_core.item_alias;
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'registry_reader') THEN
     GRANT SELECT ON ALL TABLES IN SCHEMA registry_api TO registry_reader;
+  END IF;
+END $$;
+
+-- ======================================================================== личный состав
+-- Личный состав округов: вымышленные люди на штатных местах модели «всё по три».
+-- Часть этапа 70: в той же транзакции, что и подразделения, — пересборка не может оставить места без людей.
+--
+-- Откуда люди:
+--   reused    — «свои» военнослужащие из исходного архива (mil_core.person + person_profile, синтетические по README
+--               архива). Берутся по категории звания (солдаты / сержанты / офицеры), старшие по возрасту — на старшие
+--               звания. Свои ФИО, дата рождения, национальность, анкета и личный номер сохраняются.
+--   generated — недостающие места. ФИО собираются из фамилий, имён и отчеств людей архива той же национальности,
+--               национальность — по долям архива, возраст, вид службы и образование — по званию (см. zz_age ниже).
+-- Все данные ВЫМЫШЛЕННЫЕ (C). ИИН не создаётся: формат настоящего ИИН мог бы совпасть с номером реального человека.
+-- Генератор детерминирован (setseed), повторный запуск даёт тех же людей.
+DROP VIEW IF EXISTS registry_api.subunit_people;
+DROP TABLE IF EXISTS district.person_post;
+DROP TABLE IF EXISTS district.person;
+
+CREATE TABLE district.person (
+  person_id        integer PRIMARY KEY,
+  personal_number  text NOT NULL UNIQUE,
+  last_name        text NOT NULL,
+  first_name       text NOT NULL,
+  patronymic       text,
+  sex              char(1) NOT NULL CHECK (sex IN ('М', 'Ж')),
+  birth_date       date NOT NULL,
+  nationality      text NOT NULL,
+  birthplace       text,
+  service_type     text NOT NULL CHECK (service_type IN ('срочная воинская служба', 'по контракту')),
+  service_start    date NOT NULL,
+  contract_end     date,
+  education        text,
+  marital_status   text,
+  children         smallint NOT NULL DEFAULT 0,
+  height_cm        smallint,
+  weight_kg        smallint,
+  blood_group      text,
+  fitness_category text,
+  origin           text NOT NULL CHECK (origin IN ('reused', 'generated')),
+  legacy_person_id integer UNIQUE,
+  confidence       char(1) NOT NULL DEFAULT 'C' CHECK (confidence = 'C'));
+COMMENT ON TABLE district.person IS 'Вымышленные военнослужащие учебных округов (C). reused — из исходного архива, generated — догенерированы';
+
+CREATE TABLE district.person_post (
+  subunit_code text NOT NULL,
+  seq          smallint NOT NULL,
+  seat         smallint NOT NULL CHECK (seat > 0),
+  person_id    integer NOT NULL UNIQUE REFERENCES district.person,
+  PRIMARY KEY (subunit_code, seq, seat),
+  FOREIGN KEY (subunit_code, seq) REFERENCES district.subunit_staff (subunit_code, seq));
+COMMENT ON TABLE district.person_post IS 'Кто занимает штатное место: должность subunit_staff (подразделение, seq) и номер места seat';
+
+SELECT setseed(0.2026);
+
+-- ---------------------------------------------------------------- места: каждая единица qty — отдельное место
+CREATE TEMP TABLE zz_seat ON COMMIT DROP AS
+SELECT s.subunit_code, s.seq, g.seat, s.rank_name, r.category, r.sort_order
+FROM district.subunit_staff s
+JOIN mil_core.rank r USING (rank_name)
+CROSS JOIN LATERAL generate_series(1, s.qty) g(seat);
+
+-- ---------------------------------------------------------------- люди архива («свои», армия РК)
+CREATE TEMP TABLE zz_old ON COMMIT DROP AS
+SELECT p.last_name, p.first_name, p.patronymic, pp.*, r.category
+FROM mil_core.person p
+JOIN mil_core.person_profile pp USING (person_id)
+JOIN mil_core.staff_position sp USING (person_id)
+JOIN mil_core.rank r ON r.rank_name = sp.rank_name AND r.army = 'РК';
+
+-- старшие по возрасту — на старшие звания внутри категории. Сержантские звания модели — контрактные
+-- («сержант третьего класса» и выше), поэтому срочники архива идут только на солдатские места.
+CREATE TEMP TABLE zz_match ON COMMIT DROP AS
+SELECT s.subunit_code, s.seq, s.seat, o.person_id AS legacy_id
+-- внутри одного звания места перемешаны (детерминированно, по md5 кода), чтобы люди архива были во всех округах
+FROM (SELECT *, row_number() OVER (PARTITION BY category ORDER BY sort_order DESC, md5(subunit_code || '/' || seq || '/' || seat)) rn
+      FROM zz_seat) s
+JOIN (SELECT person_id, category, row_number() OVER (PARTITION BY category ORDER BY birth_date, person_id) rn
+      FROM zz_old
+      WHERE (category = 'солдаты' OR service_type = 'по контракту')
+        AND NOT (service_type = 'срочная воинская служба' AND age(date '2026-11-01', birth_date) > interval '27 years')) o
+  ON o.category = s.category AND o.rn = s.rn;
+
+-- ---------------------------------------------------------------- пулы для генерации, по национальностям архива
+CREATE TEMP TABLE zz_nat ON COMMIT DROP AS
+SELECT nationality, n, sum(n) OVER (ORDER BY nationality) AS cum, sum(n) OVER () AS total, ln, fn, pn, bp
+FROM (SELECT nationality, count(*)::numeric n,
+             array_agg(DISTINCT last_name) ln, array_agg(DISTINCT first_name) fn,
+             array_agg(DISTINCT patronymic) FILTER (WHERE patronymic IS NOT NULL) pn,
+             array_agg(DISTINCT birthplace) FILTER (WHERE birthplace IS NOT NULL) bp
+      FROM zz_old GROUP BY nationality) x;
+
+-- возраст по званию на 01.11.2026 (лет, от–до) и доля срочников среди солдат
+CREATE TEMP TABLE zz_age ON COMMIT DROP AS
+SELECT * FROM (VALUES
+  ('рядовой', 18, 27), ('ефрейтор', 19, 28),
+  ('младший сержант', 20, 30), ('сержант', 20, 32), ('старший сержант', 22, 35),
+  ('сержант третьего класса', 21, 33), ('сержант второго класса', 24, 38), ('сержант первого класса', 27, 42),
+  ('штаб-сержант', 32, 46), ('мастер-сержант', 38, 50),
+  ('лейтенант', 22, 25), ('старший лейтенант', 24, 28), ('капитан', 27, 34), ('майор', 32, 40),
+  ('подполковник', 37, 45), ('полковник', 42, 50)
+) a(rank_name, age_min, age_max);
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM zz_seat s WHERE NOT EXISTS (SELECT 1 FROM zz_age a WHERE a.rank_name = s.rank_name)) THEN
+    RAISE EXCEPTION 'для звания нет возрастного диапазона в zz_age';
+  END IF;
+END $$;
+
+-- места без человека из архива
+CREATE TEMP TABLE zz_need ON COMMIT DROP AS
+SELECT s.*, row_number() OVER (ORDER BY s.subunit_code, s.seq, s.seat) AS k,
+       random() AS r_nat, random() AS r_age, random() AS r_srv
+FROM zz_seat s
+WHERE NOT EXISTS (SELECT 1 FROM zz_match m WHERE (m.subunit_code, m.seq, m.seat) = (s.subunit_code, s.seq, s.seat));
+
+CREATE TEMP TABLE zz_gen ON COMMIT DROP AS
+SELECT n.*, z.nationality, z.ln, z.fn, z.pn, z.bp,
+       -- срочники — 18–21 год, остальные — по диапазону звания
+       (date '2026-11-01'
+          - make_interval(years => CASE WHEN n.category = 'солдаты' AND n.r_srv < 0.6 THEN 18 ELSE a.age_min END)
+          - make_interval(days => floor(n.r_age * ((CASE WHEN n.category = 'солдаты' AND n.r_srv < 0.6 THEN 4
+                                                         ELSE a.age_max - a.age_min + 1 END) * 365))::int))::date AS birth_date,
+       CASE WHEN n.category = 'солдаты' AND n.r_srv < 0.6 THEN 'срочная воинская служба' ELSE 'по контракту' END AS service_type
+FROM zz_need n
+JOIN zz_age a USING (rank_name)
+JOIN zz_nat z ON n.r_nat * z.total > z.cum - z.n AND n.r_nat * z.total <= z.cum;
+
+-- ---------------------------------------------------------------- люди
+INSERT INTO district.person (person_id, personal_number, last_name, first_name, patronymic, sex, birth_date, nationality,
+       birthplace, service_type, service_start, contract_end, education, marital_status, children, height_cm, weight_kg,
+       blood_group, fitness_category, origin, legacy_person_id)
+SELECT o.person_id, o.personal_number, o.last_name, o.first_name, o.patronymic, o.sex, o.birth_date, o.nationality,
+       o.birthplace, o.service_type, o.service_start, o.contract_end, o.education, o.marital_status, coalesce(o.children, 0),
+       o.height_cm, o.weight_kg, o.blood_group, o.fitness_category, 'reused', o.person_id
+FROM zz_match m JOIN zz_old o ON o.person_id = m.legacy_id;
+
+INSERT INTO district.person (person_id, personal_number, last_name, first_name, patronymic, sex, birth_date, nationality,
+       birthplace, service_type, service_start, contract_end, education, marital_status, children, height_cm, weight_kg,
+       blood_group, fitness_category, origin)
+SELECT 100000 + g.k,
+       'ЛН-' || lpad(((SELECT max(substring(personal_number FROM '\d+$')::int) FROM zz_old WHERE personal_number ~ '^ЛН-\d+$') + g.k)::text, 6, '0'),
+       g.ln[1 + floor(random() * array_length(g.ln, 1))::int],
+       g.fn[1 + floor(random() * array_length(g.fn, 1))::int],
+       CASE WHEN g.pn IS NULL THEN NULL ELSE g.pn[1 + floor(random() * array_length(g.pn, 1))::int] END,
+       'М', g.birth_date, g.nationality,
+       CASE WHEN g.bp IS NULL THEN NULL ELSE g.bp[1 + floor(random() * array_length(g.bp, 1))::int] END,
+       g.service_type,
+       -- начало службы: срочники — за последние 11 мес., контрактники — с 19 лет и не позже чем год назад
+       CASE WHEN g.service_type = 'срочная воинская служба'
+            THEN date '2026-11-01' - floor(random() * 330)::int
+            ELSE least(date '2025-11-01', (g.birth_date + interval '19 years')::date
+                       + floor(random() * greatest(1, (date '2025-11-01' - (g.birth_date + interval '19 years')::date)))::int) END,
+       NULL,
+       CASE WHEN g.category = 'офицеры' THEN 'высшее военное'
+            WHEN g.category = 'сержанты' THEN (ARRAY['техническое и профессиональное', 'техническое и профессиональное', 'общее среднее', 'высшее'])[1 + floor(random() * 4)::int]
+            ELSE (ARRAY['общее среднее', 'общее среднее', 'общее среднее', 'техническое и профессиональное'])[1 + floor(random() * 4)::int] END,
+       CASE WHEN date '2026-11-01' - g.birth_date > 26 * 365 AND random() < 0.65 THEN 'женат' ELSE 'холост' END,
+       0,
+       165 + floor(random() * 26)::int,
+       0,
+       (ARRAY['0(I) Rh+', '0(I) Rh+', '0(I) Rh+', 'A(II) Rh+', 'A(II) Rh+', 'A(II) Rh+', 'B(III) Rh+', 'B(III) Rh+',
+              'AB(IV) Rh+', '0(I) Rh−', 'A(II) Rh−', 'B(III) Rh−'])[1 + floor(random() * 12)::int],
+       CASE WHEN random() < 0.85 THEN 'А (годен)' ELSE 'Б (годен с незначительными ограничениями)' END,
+       'generated'
+FROM zz_gen g;
+
+-- зависимые поля: вес от роста, дети у женатых, конец контракта (3 или 5 лет)
+UPDATE district.person SET
+  weight_kg = least(110, greatest(55, height_cm - 105 + floor(random() * 15)::int - 5)),
+  children = CASE WHEN marital_status = 'женат' THEN floor(random() * 4)::int ELSE 0 END,
+  contract_end = CASE WHEN service_type = 'по контракту'
+                      THEN (service_start + make_interval(years => CASE WHEN random() < 0.5 THEN 3 ELSE 5 END)
+                            * (1 + floor((date '2026-11-01' - service_start) / (365 * 4))::int))::date END
+WHERE origin = 'generated';
+
+-- ---------------------------------------------------------------- назначения на места
+INSERT INTO district.person_post (subunit_code, seq, seat, person_id)
+SELECT subunit_code, seq, seat, legacy_id FROM zz_match
+UNION ALL
+SELECT subunit_code, seq, seat, 100000 + k FROM zz_need;
+
+-- ---------------------------------------------------------------- представление для Django (только чтение)
+CREATE VIEW registry_api.subunit_people AS
+SELECT pp.subunit_code, u.formation_code, f.district_code, u.subunit_name, u.level,
+       st.seq, pp.seat, st.position_name, st.rank_name, r.category AS rank_category, r.sort_order AS rank_order,
+       p.person_id, p.personal_number,
+       p.last_name || ' ' || p.first_name || coalesce(' ' || p.patronymic, '') AS full_name,
+       p.last_name, p.first_name, p.patronymic, p.sex, p.birth_date,
+       date_part('year', age(date '2026-11-01', p.birth_date))::int AS age,
+       p.nationality, p.birthplace, p.service_type, p.service_start, p.contract_end, p.education,
+       p.marital_status, p.children, p.height_cm, p.weight_kg, p.blood_group, p.fitness_category,
+       p.origin, p.confidence
+FROM district.person_post pp
+JOIN district.person p USING (person_id)
+JOIN district.subunit_staff st ON st.subunit_code = pp.subunit_code AND st.seq = pp.seq
+JOIN mil_core.rank r ON r.rank_name = st.rank_name
+JOIN district.subunit u ON u.subunit_code = pp.subunit_code
+JOIN district.formation f ON f.formation_code = u.formation_code;
+COMMENT ON VIEW registry_api.subunit_people IS 'Вымышленный личный состав учебных округов (C): кто на какой должности';
+GRANT SELECT ON registry_api.subunit_people TO registry_reader;
+
+-- ---------------------------------------------------------------- проверки
+DO $$ BEGIN
+  IF (SELECT count(*) FROM district.person_post) <> (SELECT sum(qty) FROM district.subunit_staff) THEN
+    RAISE EXCEPTION 'не на каждом штатном месте есть человек';
+  END IF;
+  IF (SELECT count(*) FROM district.person) <> (SELECT count(*) FROM district.person_post) THEN
+    RAISE EXCEPTION 'есть люди без должности';
+  END IF;
+  IF EXISTS (SELECT 1 FROM registry_api.subunit_people WHERE age < 18 OR age > 60) THEN
+    RAISE EXCEPTION 'возраст вне 18–60 лет';
+  END IF;
+  IF EXISTS (SELECT 1 FROM registry_api.subunit_people WHERE service_type = 'срочная воинская служба' AND age > 27) THEN
+    RAISE EXCEPTION 'срочник старше 27 лет';
+  END IF;
+  IF EXISTS (SELECT 1 FROM registry_api.subunit_people WHERE rank_category <> 'солдаты' AND service_type = 'срочная воинская служба') THEN
+    RAISE EXCEPTION 'срочник на должности сержанта или офицера';
+  END IF;
+  IF EXISTS (SELECT 1 FROM district.person WHERE last_name IS NULL OR first_name IS NULL) THEN
+    RAISE EXCEPTION 'есть человек без фамилии или имени';
   END IF;
 END $$;
 
