@@ -28,6 +28,7 @@ TEMPLATES = [{
         'django.template.context_processors.request',
         'django.contrib.auth.context_processors.auth',
         'django.contrib.messages.context_processors.messages',
+        'catalog.context.person',
     ], 'builtins': ['catalog.templatetags.fmt']},
 }]
 WSGI_APPLICATION = 'config.wsgi.application'

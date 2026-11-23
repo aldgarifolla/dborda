@@ -15,4 +15,6 @@ urlpatterns = [
     path('assistant/c/<int:chat_id>/rename/', views.assistant_rename, name='assistant_rename'),
     path('assistant/c/<int:chat_id>/delete/', views.assistant_delete, name='assistant_delete'),
     path('grants/', views.manage_grants, name='manage_grants'),
+    path('grants/users/create/', views.user_create, name='user_create'),
+    path('grants/users/<int:pk>/toggle/', views.user_toggle, name='user_toggle'),
 ]

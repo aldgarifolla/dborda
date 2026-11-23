@@ -12,7 +12,8 @@ from . import repository as repo
 from .assistant import answer as assistant_answer
 from .assistant.engine import LIMIT_TEXT, limit_status, suggest_title
 from .models import AssistantChat, UnitGrant, UserRole, GrantAudit
-from .services import assign_grant, GrantDenied
+from django.core.exceptions import ValidationError
+from .services import assign_grant, can_manage, create_user, GrantDenied, set_user_active
 
 TABS = ('summary', 'people', 'equipment', 'supply')
 CHAT_LIST_LEN = 40        # чатов в боковом меню
@@ -351,8 +352,61 @@ def manage_grants(request):
             messages.error(request, 'Операция отклонена: проверь пользователя, округ и свои права')
         return redirect('manage_grants')
     visible = UnitGrant.objects.filter(user__in=viewers, root_code__in=scope, is_active=True).select_related('user').order_by('user__username', 'root_code')[:120]
-    audit = GrantAudit.objects.filter(actor=request.user).select_related('target')[:20]
+    audit = GrantAudit.objects.filter(actor=request.user).select_related('target', 'target__demo_role')[:20]
     return render(request, 'catalog/grants.html', {
         'viewers': viewers, 'visible_grants': visible,
-        'districts': repo.list_districts(scope), 'audit': audit,
+        'districts': repo.list_districts(scope), 'audit': audit, 'users': user_rows(request.user),
+        'form': request.session.pop('user_form', {}), 'form_errors': request.session.pop('user_form_errors', {}),
     })
+
+
+def user_rows(actor):
+    """Пользователи для таблицы на странице прав: ФИО, логин, роль, округа, можно ли управлять."""
+    rows = []
+    users = get_user_model().objects.filter(is_superuser=False).select_related('demo_role').order_by('-is_active', 'username')
+    grants = {}
+    for g in UnitGrant.objects.filter(is_active=True).order_by('root_code'):
+        grants.setdefault(g.user_id, []).append(g.root_code)
+    for u in users:
+        role = getattr(u, 'demo_role', None)
+        rows.append({'user': u, 'name': role.full_name if role and role.full_name else '—',
+                     'role': role.get_role_display() if role else '—', 'districts': grants.get(u.pk, []),
+                     'manageable': can_manage(actor, u)})
+    return rows
+
+
+def is_manager(user):
+    return UserRole.objects.filter(user=user, role='manager').exists() and not user.is_superuser
+
+
+@login_required
+@require_POST
+def user_create(request):
+    if not is_manager(request.user):
+        return HttpResponseForbidden('Недостаточно прав')
+    data = request.POST
+    try:
+        user = create_user(request.user, data.get('full_name', '')[:150], data.get('username', '')[:30], data.get('role', ''),
+                           data.get('password', ''), data.getlist('districts'))
+        messages.success(request, f'Пользователь {user.username} создан. Передайте ему логин и пароль лично.')
+    except ValidationError as exc:
+        request.session['user_form'] = {k: data.get(k, '') for k in ('full_name', 'username', 'role')} | {'districts': data.getlist('districts')}
+        request.session['user_form_errors'] = exc.message_dict
+        messages.error(request, 'Пользователь не создан: исправьте поля формы.')
+    except GrantDenied:
+        messages.error(request, 'Операция отклонена.')
+    return redirect(reverse('manage_grants') + '#users')
+
+
+@login_required
+@require_POST
+def user_toggle(request, pk):
+    if not is_manager(request.user):
+        return HttpResponseForbidden('Недостаточно прав')
+    target = get_object_or_404(get_user_model(), pk=pk)
+    try:
+        set_user_active(request.user, target, request.POST.get('active') == '1')
+        messages.success(request, f'Доступ пользователя {target.username} {"включён" if target.is_active else "отключён"}.')
+    except GrantDenied:
+        messages.error(request, 'Этим пользователем управлять нельзя.')
+    return redirect(reverse('manage_grants') + '#users')

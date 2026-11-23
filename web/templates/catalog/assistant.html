@@ -12,7 +12,7 @@
     <div class="chat-thread" id="chat-thread">{% for m in chat_messages %}{% include 'catalog/_chat_message.html' %}{% endfor %}</div>
     {% if not chat %}<div class="chat-welcome" id="chat-welcome">
       <div class="welcome-mark" aria-hidden="true"><svg viewBox="0 0 120 120"><g fill="#FFFFFF"><rect x="15" y="22" width="90" height="14" rx="4"/><rect x="30" y="53" width="60" height="14" rx="4"/><rect x="45" y="84" width="30" height="14" rx="4"/></g></svg></div>
-      <h1>Чем помочь, {{ user.username }}?</h1>
+      <h1>Чем помочь, {{ me.given }}?</h1>
       {% if districts %}<p class="muted">Спрашивайте по-русски, по-казахски или по-английски. Доступные округа: {% for d in districts %}{{ d.short_name }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>
       <div class="chips">{% for e in examples %}<button type="button" class="chip" data-question="{{ e }}">{{ e }}</button>{% endfor %}</div>
       {% else %}<div class="empty">Для вопросов нужен доступ хотя бы к одному округу.</div>{% endif %}

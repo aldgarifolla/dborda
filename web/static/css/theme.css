@@ -168,3 +168,11 @@
 .zone-list{gap:6px}.zone-list .tag{background:var(--surface-soft);color:var(--text);font-size:13px;padding:6px 10px}
 .people-filters{display:flex;flex-wrap:wrap;gap:10px 22px;margin:0 0 10px}.people-filters .tag-list{gap:6px}
 .people-count{margin:0 0 10px;font-size:12px}
+.user-actions{display:flex;gap:14px;align-items:center}.user-actions a.logout:hover{text-decoration:none;color:#fff}
+.form-panel{max-width:520px}.form-panel form{display:grid;gap:2px}.form-panel .btn{width:fit-content;margin-top:14px}
+.field-error{color:var(--danger);font-size:12px;margin:4px 0 0}
+.user-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 16px;margin-top:8px}
+.user-form .field.wide{grid-column:1/-1}.user-form .label{display:block;margin:12px 0 6px;font-size:12px;color:var(--muted);font-weight:650}
+.user-form .check{display:inline-flex;align-items:center;gap:7px;margin:0;padding:7px 11px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text);font-weight:500;cursor:pointer}
+.user-form .check input{width:auto}.user-form .btn{margin-top:14px;width:fit-content}
+@media (max-width:1050px){.user-form{grid-template-columns:1fr}}
